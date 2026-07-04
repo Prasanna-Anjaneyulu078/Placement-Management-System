@@ -111,6 +111,18 @@
 			<artifactId>opencsv</artifactId>
 			<version>5.9</version>
 		</dependency>
+		<!-- Tess4J - Tesseract OCR Java wrapper -->
+		<dependency>
+			<groupId>net.sourceforge.tess4j</groupId>
+			<artifactId>tess4j</artifactId>
+			<version>5.11.0</version>
+		</dependency>
+		<!-- Apache PDFBox - PDF processing/rendering for OCR -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.2</version>
+		</dependency>
 	</dependencies>
 
 	<build>

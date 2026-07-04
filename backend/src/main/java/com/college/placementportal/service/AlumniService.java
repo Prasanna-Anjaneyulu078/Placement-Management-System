@@ -68,6 +68,10 @@ public class AlumniService {
         dto.setLinkedinUrl(alumni.getLinkedinUrl());
         dto.setVerificationDocumentUrl(alumni.getVerificationDocumentUrl());
         dto.setProfileImageUrl(alumni.getProfileImageUrl());
+        dto.setOcrVerified(alumni.getOcrVerified());
+        dto.setOcrExtractedName(alumni.getOcrExtractedName());
+        dto.setOcrExtractedRollNumber(alumni.getOcrExtractedRollNumber());
+        dto.setOcrDetectedCollege(alumni.getOcrDetectedCollege());
 
         if (alumni.getUser() != null) {
             UserSummaryDto userDto = new UserSummaryDto(

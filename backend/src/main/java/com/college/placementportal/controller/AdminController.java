@@ -6,6 +6,7 @@ import com.college.placementportal.service.ApplicationService;
 import com.college.placementportal.service.ReportExportService;
 import com.college.placementportal.service.AlumniDocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.core.io.Resource;
@@ -23,9 +24,14 @@ import org.springframework.web.multipart.MultipartFile;
 import com.college.placementportal.dto.AdminProfileDto;
 import com.college.placementportal.dto.PasswordChangeDto;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
 
     @Autowired
     private AdminService adminService;
@@ -85,15 +91,22 @@ public class AdminController {
 
     @DeleteMapping("/alumni/{id}")
     public ResponseEntity<?> deleteAlumni(@PathVariable @NonNull Long id) {
-        adminService.deleteAlumni(id);
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Alumni account deleted successfully"
-        ));
+        try {
+            adminService.deleteAlumni(id);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Alumni account permanently deleted"
+            ));
+        } catch (com.college.placementportal.exception.ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                "success", false,
+                "message", "Alumni record not found"
+            ));
+        }
     }
 
     @GetMapping("/alumni/{id}/document")
-    public ResponseEntity<Map<String, Object>> getAlumniDocumentMetadata(@PathVariable("id") Long id) {
+    public ResponseEntity<Map<String, Object>> getAlumniDocumentMetadata(@PathVariable("id") @NonNull Long id) {
         return ResponseEntity.ok(adminService.getAlumniDocumentMetadata(id));
     }
 
@@ -166,28 +179,44 @@ public class AdminController {
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<AdminProfileDto> getProfile(Principal principal) {
+    public ResponseEntity<?> getProfile(Principal principal) {
+        if (principal == null || principal.getName() == null) {
+            logger.warn("Unauthorized access attempt to /api/admin/profile");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User not authenticated"));
+        }
+        logger.info("Controller: GET /api/admin/profile called by user: {}", principal.getName());
         return ResponseEntity.ok(adminService.getAdminProfile(principal.getName()));
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<AdminProfileDto> updateProfile(Principal principal, @RequestBody AdminProfileDto dto) {
+    public ResponseEntity<?> updateProfile(Principal principal, @RequestBody AdminProfileDto dto) {
+        if (principal == null || principal.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Unauthorized access"));
+        }
         return ResponseEntity.ok(adminService.updateAdminProfile(principal.getName(), dto));
     }
 
     @PostMapping("/profile/image")
-    public ResponseEntity<?> uploadProfileImage(Principal principal, @RequestParam("image") MultipartFile file) {
-        try {
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "File is empty"));
-            }
-            String base64Image = Base64.getEncoder().encodeToString(file.getBytes());
-            String imageUrl = "data:" + file.getContentType() + ";base64," + base64Image;
-            adminService.updateAdminProfileImage(principal.getName(), imageUrl);
-            return ResponseEntity.ok(Map.of("imageUrl", imageUrl));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Failed to upload image"));
+    public ResponseEntity<?> uploadProfileImage(Principal principal, @RequestParam("image") MultipartFile file) throws Exception {
+        if (principal == null || principal.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Unauthorized access"));
         }
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "File is empty"));
+        }
+        String base64Image = Base64.getEncoder().encodeToString(file.getBytes());
+        String imageUrl = "data:" + file.getContentType() + ";base64," + base64Image;
+        adminService.updateAdminProfileImage(principal.getName(), imageUrl);
+        return ResponseEntity.ok(Map.of("imageUrl", imageUrl));
+    }
+
+    @DeleteMapping("/profile/image")
+    public ResponseEntity<?> deleteProfileImage(Principal principal) {
+        if (principal == null || principal.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Unauthorized access"));
+        }
+        adminService.deleteAdminProfileImage(principal.getName());
+        return ResponseEntity.ok(Map.of("success", true, "message", "Profile image deleted successfully"));
     }
 
     @PutMapping("/change-password")

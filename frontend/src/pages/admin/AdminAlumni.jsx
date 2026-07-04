@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { Search, Shield, Ban, CheckCircle, X, Trash2 } from 'lucide-react';
+import { Search, Shield, Ban, CheckCircle, X, Trash2, ScanSearch } from 'lucide-react';
 import { PageHeader, SearchInput, Table, Button, LoadingSpinner, Modal } from '../../components/common';
 import { toast } from 'react-toastify';
 import api from '../../utils/axiosConfig';
@@ -281,10 +281,18 @@ export default function AdminAlumni() {
                     </div>
                   </div>
 
-                  {/* Verification Status */}
-                  <div className="mb-4 lg:mb-0 lg:w-1/6 flex items-center lg:justify-center">
+                  {/* Verification Status + OCR Badge */}
+                  <div className="mb-4 lg:mb-0 lg:w-1/6 flex flex-col items-start lg:items-center gap-1.5">
                     <span className={`px-3 py-1 rounded-full text-[11px] font-bold border uppercase tracking-wide inline-flex items-center justify-center ${getStatusBadge(alum.verificationStatus)}`}>
                       {alum.verificationStatus}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      alum.ocrVerified
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-gray-100 text-gray-400 border-gray-200'
+                    }`} title={alum.ocrVerified ? 'OCR Verified' : 'OCR not verified'}>
+                      <ScanSearch className="w-3 h-3" />
+                      {alum.ocrVerified ? 'OCR ✓' : 'OCR —'}
                     </span>
                   </div>
 
@@ -422,26 +430,70 @@ export default function AdminAlumni() {
         onClose={() => setViewingDocs(null)}
         title="Document Verification"
         footer={
-          <div className="flex justify-end gap-3 w-full">
-            {docMetadata?.documentUrl && (
-              <>
+          <div className="flex flex-col sm:flex-row justify-between gap-3 w-full">
+            <div className="flex gap-2">
+              {viewingDocs && viewingDocs.verificationStatus !== 'VERIFIED' && (
                 <Button 
-                  variant="outline" 
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                  onClick={() => window.open(docMetadata.documentUrl.startsWith('http') ? docMetadata.documentUrl : api.defaults.baseURL + docMetadata.documentUrl, '_blank')}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => {
+                    verifyUser(viewingDocs.id, 'Verified');
+                    setViewingDocs(null);
+                  }}
                 >
-                  View Original
+                  Approve
                 </Button>
-                <a 
-                  href={docMetadata.documentUrl.startsWith('http') ? docMetadata.documentUrl : api.defaults.baseURL + docMetadata.documentUrl} 
-                  download 
-                  className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 border border-transparent rounded-xl text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+              )}
+              {viewingDocs && viewingDocs.verificationStatus !== 'REJECTED' && (
+                <Button 
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => {
+                    setRejectingAlum(viewingDocs);
+                    setViewingDocs(null);
+                  }}
                 >
-                  Download
-                </a>
-              </>
-            )}
-            <Button variant="outline" onClick={() => setViewingDocs(null)}>Close</Button>
+                  Reject
+                </Button>
+              )}
+              {viewingDocs && (
+                <Button 
+                  size="sm"
+                  variant="outline"
+                  className="text-[#DC2626] border-[#DC2626] bg-[#FFFFFF] hover:bg-red-50"
+                  onClick={() => {
+                    setDeletingAlum(viewingDocs);
+                    setDeleteConfirmText('');
+                    setViewingDocs(null);
+                  }}
+                >
+                  Delete Alumni
+                </Button>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              {docMetadata?.documentUrl && (
+                <>
+                  <Button 
+                    size="sm"
+                    variant="outline" 
+                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                    onClick={() => window.open(docMetadata.documentUrl.startsWith('http') ? docMetadata.documentUrl : api.defaults.baseURL + docMetadata.documentUrl, '_blank')}
+                  >
+                    Open Original
+                  </Button>
+                  <a 
+                    href={docMetadata.documentUrl.startsWith('http') ? docMetadata.documentUrl : api.defaults.baseURL + docMetadata.documentUrl} 
+                    download 
+                    className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 border border-transparent rounded-xl text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                  >
+                    Download
+                  </a>
+                </>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setViewingDocs(null)}>Close</Button>
+            </div>
           </div>
         }
       >
@@ -457,6 +509,35 @@ export default function AdminAlumni() {
                  <p className="text-sm text-gray-500 font-medium">{viewingDocs.passingYear ? `Class of ${viewingDocs.passingYear}` : 'Graduation Year Not Available'}</p>
                  <p className="text-sm text-gray-400">{viewingDocs.department || 'Department N/A'}</p>
                </div>
+            </div>
+
+            {/* OCR Verification Results */}
+            <div className={`rounded-xl border p-4 ${viewingDocs.ocrVerified ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <ScanSearch className={`w-4 h-4 ${viewingDocs.ocrVerified ? 'text-emerald-600' : 'text-gray-400'}`} />
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-600">OCR Document Verification</span>
+                <span className={`ml-auto inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  viewingDocs.ocrVerified
+                    ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                    : 'bg-gray-200 text-gray-500 border-gray-300'
+                }`}>
+                  {viewingDocs.ocrVerified ? '✓ Verified' : '— Not Verified'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div className="bg-white/80 rounded-lg p-3 border border-gray-100">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Extracted Name</span>
+                  <span className="font-semibold text-gray-800 break-words">{viewingDocs.ocrExtractedName || <span className="text-gray-400 font-normal italic">Not detected</span>}</span>
+                </div>
+                <div className="bg-white/80 rounded-lg p-3 border border-gray-100">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Extracted Roll No.</span>
+                  <span className="font-semibold text-gray-800 font-mono">{viewingDocs.ocrExtractedRollNumber || <span className="text-gray-400 font-normal italic">Not detected</span>}</span>
+                </div>
+                <div className="bg-white/80 rounded-lg p-3 border border-gray-100">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Detected College</span>
+                  <span className="font-semibold text-gray-800">{viewingDocs.ocrDetectedCollege || <span className="text-gray-400 font-normal italic">Not detected</span>}</span>
+                </div>
+              </div>
             </div>
 
             {/* Document Content */}

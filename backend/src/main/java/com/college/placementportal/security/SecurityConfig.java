@@ -57,7 +57,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> 
                 auth.requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/api/public/**").permitAll()
+                    .requestMatchers("/api/departments/**", "/api/departments").permitAll()
                     .requestMatchers("/api/student/profile/image/**").permitAll()
+                    .requestMatchers("/api/admin/alumni/documents/**").permitAll()
+                    .requestMatchers("/uploads/**").permitAll()
                     .requestMatchers("/api/admin/users/students/test").permitAll()
                     .requestMatchers("/api/admin/users/admins/**").hasRole("SUPER_ADMIN")
                     .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")

@@ -42,7 +42,9 @@ export default function Header({ role, onToggleSidebar, user, onLogout }) {
           <Menu size={24} />
         </button>
         <div className="flex flex-col">
-          <h1 className="header-title" style={{ marginBottom: role === 'admin' ? '-2px' : '0' }}>{title}</h1>
+          <h1 className="header-title" style={{ marginBottom: role === 'admin' ? '-2px' : '0' }}>
+            {role === 'admin' ? (user?.name || 'Administrator') : title}
+          </h1>
           {role === 'admin' && (
             <span className="text-xs md:text-sm font-medium text-gray-500">
               {user?.designation || 'Administrator'}

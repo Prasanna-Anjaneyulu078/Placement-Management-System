@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import org.springframework.lang.NonNull;
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/admin/users")
@@ -133,5 +134,16 @@ public class AdminUserManagementController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<UserCredentialsResponse> addAdmin(@Valid @RequestBody AddAdminRequest request) {
         return ResponseEntity.ok(userManagementService.addAdmin(request));
+    }
+
+    @DeleteMapping("/alumni/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<java.util.Map<String, Object>> deleteAlumni(@PathVariable @NonNull Long id, Principal principal) {
+        try {
+            userManagementService.hardDeleteAlumni(id, principal);
+            return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Alumni account permanently deleted."));
+        } catch (com.college.placementportal.exception.ResourceNotFoundException e) {
+            return ResponseEntity.status(404).body(java.util.Map.of("success", false, "message", "Alumni record not found."));
+        }
     }
 }

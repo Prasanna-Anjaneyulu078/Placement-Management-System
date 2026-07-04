@@ -13,4 +13,6 @@ public interface AlumniRepository extends JpaRepository<Alumni, Long> {
     Optional<Alumni> findByUserId(Long userId);
     List<Alumni> findByVerificationStatus(VerificationStatus status);
     long countByVerificationStatus(VerificationStatus status);
+    
+    Optional<Alumni> findByRollNumber(String rollNumber);
 }

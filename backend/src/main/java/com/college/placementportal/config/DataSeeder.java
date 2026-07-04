@@ -66,7 +66,6 @@ public class DataSeeder implements CommandLineRunner {
             student.setAcademicYear("2023-2024");
             student.setVerificationStatus(com.college.placementportal.enums.VerificationStatus.VERIFIED);
             studentRepository.save(student);
-
             System.out.println("Default Student created: student@vvit.edu.in / student123");
         }
 
@@ -85,7 +84,6 @@ public class DataSeeder implements CommandLineRunner {
             alumni.setPassingYear(2022);
             alumni.setVerificationStatus(com.college.placementportal.enums.VerificationStatus.VERIFIED);
             alumniRepository.save(alumni);
-
             System.out.println("Default Alumni created: alumni@vvit.edu.in / alumni123");
         }
     }

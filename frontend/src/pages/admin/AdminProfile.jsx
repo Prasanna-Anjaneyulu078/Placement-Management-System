@@ -79,10 +79,15 @@ export default function AdminProfile() {
   const saveProfile = async (formType) => {
     try {
       setIsSaving(true);
+      const emailChanged = profile?.email && personalForm.email !== profile.email;
       const updatedData = { ...profile, ...personalForm, ...professionalForm };
       const res = await api.put('/admin/profile', updatedData);
       setProfile(res.data);
-      toast.success('Profile updated successfully');
+      if (formType === 'personal' && emailChanged) {
+        toast.success('Email updated successfully. Please log in again if your session expires.');
+      } else {
+        toast.success('Profile updated successfully');
+      }
       setIsEditingPersonal(false);
       setIsEditingProfessional(false);
     } catch (err) {
@@ -198,7 +203,7 @@ export default function AdminProfile() {
               <form onSubmit={(e) => { e.preventDefault(); saveProfile('personal'); }} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Input label="Full Name" value={personalForm.name} onChange={e => setPersonalForm({...personalForm, name: e.target.value})} required />
-                  <Input label="Email" type="email" value={personalForm.email} onChange={e => setPersonalForm({...personalForm, email: e.target.value})} required disabled />
+                  <Input label="Email" type="email" value={personalForm.email} onChange={e => setPersonalForm({...personalForm, email: e.target.value})} required />
                   <Input label="Mobile Number" value={personalForm.mobileNumber} onChange={e => setPersonalForm({...personalForm, mobileNumber: e.target.value})} />
                 </div>
                 <div className="flex justify-end pt-4 border-t border-gray-100 gap-3">
@@ -241,17 +246,7 @@ export default function AdminProfile() {
               <form onSubmit={(e) => { e.preventDefault(); saveProfile('professional'); }} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>
-                    <select
-                      className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#0A4D8C]/20 outline-none font-medium transition-all appearance-none"
-                      value={professionalForm.department}
-                      onChange={e => setProfessionalForm({...professionalForm, department: e.target.value})}
-                    >
-                      <option value="">Select Department</option>
-                      {departments.map(d => (
-                        <option key={d.code} value={d.code}>{d.name} ({d.code})</option>
-                      ))}
-                    </select>
+                    <Input label="Department" value={professionalForm.department} onChange={e => setProfessionalForm({...professionalForm, department: e.target.value})} placeholder="e.g. Training & Placement Cell" />
                   </div>
                   <Input label="Designation" value={professionalForm.designation} onChange={e => setProfessionalForm({...professionalForm, designation: e.target.value})} />
                 </div>

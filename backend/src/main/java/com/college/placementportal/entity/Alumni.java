@@ -2,19 +2,17 @@ package com.college.placementportal.entity;
 
 import com.college.placementportal.enums.VerificationStatus;
 import jakarta.persistence.*;
-import org.hibernate.annotations.SQLRestriction;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "alumni")
-@SQLRestriction("is_active = true")
 public class Alumni {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
 
@@ -44,14 +42,20 @@ public class Alumni {
     private String rejectionReason;
     private LocalDateTime rejectedDate;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean isActive = true;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
 
-    @Column(name = "deleted_by")
-    private String deletedBy;
+    // OCR Verification fields
+    @Column(name = "ocr_verified")
+    private Boolean ocrVerified = false;
+
+    @Column(name = "ocr_extracted_name")
+    private String ocrExtractedName;
+
+    @Column(name = "ocr_extracted_roll_number")
+    private String ocrExtractedRollNumber;
+
+    @Column(name = "ocr_detected_college")
+    private String ocrDetectedCollege;
 
     public Alumni() {}
 
@@ -151,27 +155,37 @@ public class Alumni {
         this.rejectedDate = rejectedDate;
     }
 
-    public boolean isActive() {
-        return isActive;
+
+
+    public Boolean getOcrVerified() {
+        return ocrVerified;
     }
 
-    public void setActive(boolean active) {
-        isActive = active;
+    public void setOcrVerified(Boolean ocrVerified) {
+        this.ocrVerified = ocrVerified;
     }
 
-    public LocalDateTime getDeletedAt() {
-        return deletedAt;
+    public String getOcrExtractedName() {
+        return ocrExtractedName;
     }
 
-    public void setDeletedAt(LocalDateTime deletedAt) {
-        this.deletedAt = deletedAt;
+    public void setOcrExtractedName(String ocrExtractedName) {
+        this.ocrExtractedName = ocrExtractedName;
     }
 
-    public String getDeletedBy() {
-        return deletedBy;
+    public String getOcrExtractedRollNumber() {
+        return ocrExtractedRollNumber;
     }
 
-    public void setDeletedBy(String deletedBy) {
-        this.deletedBy = deletedBy;
+    public void setOcrExtractedRollNumber(String ocrExtractedRollNumber) {
+        this.ocrExtractedRollNumber = ocrExtractedRollNumber;
+    }
+
+    public String getOcrDetectedCollege() {
+        return ocrDetectedCollege;
+    }
+
+    public void setOcrDetectedCollege(String ocrDetectedCollege) {
+        this.ocrDetectedCollege = ocrDetectedCollege;
     }
 }

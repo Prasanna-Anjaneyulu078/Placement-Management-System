@@ -18,8 +18,7 @@ public class AdminProfile {
     private String location;
     private String gender;
     
-    @Enumerated(EnumType.STRING)
-    private com.college.placementportal.enums.Department department;
+    private String department;
     private String designation;
     private String employeeId;
     private String officeLocation;
@@ -44,8 +43,8 @@ public class AdminProfile {
     public String getGender() { return gender; }
     public void setGender(String gender) { this.gender = gender; }
     
-    public com.college.placementportal.enums.Department getDepartment() { return department; }
-    public void setDepartment(com.college.placementportal.enums.Department department) { this.department = department; }
+    public String getDepartment() { return department; }
+    public void setDepartment(String department) { this.department = department; }
     
     public String getDesignation() { return designation; }
     public void setDesignation(String designation) { this.designation = designation; }

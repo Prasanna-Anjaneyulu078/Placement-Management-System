@@ -15,6 +15,11 @@ public class AlumniResponseDto {
     private String linkedinUrl;
     private String verificationDocumentUrl;
     private String profileImageUrl;
+    // OCR verification metadata
+    private Boolean ocrVerified;
+    private String ocrExtractedName;
+    private String ocrExtractedRollNumber;
+    private String ocrDetectedCollege;
 
     public AlumniResponseDto() {}
 
@@ -46,4 +51,12 @@ public class AlumniResponseDto {
     public void setVerificationDocumentUrl(String verificationDocumentUrl) { this.verificationDocumentUrl = verificationDocumentUrl; }
     public String getProfileImageUrl() { return profileImageUrl; }
     public void setProfileImageUrl(String profileImageUrl) { this.profileImageUrl = profileImageUrl; }
+    public Boolean getOcrVerified() { return ocrVerified; }
+    public void setOcrVerified(Boolean ocrVerified) { this.ocrVerified = ocrVerified; }
+    public String getOcrExtractedName() { return ocrExtractedName; }
+    public void setOcrExtractedName(String ocrExtractedName) { this.ocrExtractedName = ocrExtractedName; }
+    public String getOcrExtractedRollNumber() { return ocrExtractedRollNumber; }
+    public void setOcrExtractedRollNumber(String ocrExtractedRollNumber) { this.ocrExtractedRollNumber = ocrExtractedRollNumber; }
+    public String getOcrDetectedCollege() { return ocrDetectedCollege; }
+    public void setOcrDetectedCollege(String ocrDetectedCollege) { this.ocrDetectedCollege = ocrDetectedCollege; }
 }

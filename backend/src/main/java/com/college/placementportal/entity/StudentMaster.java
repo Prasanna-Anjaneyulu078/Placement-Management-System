@@ -1,9 +1,7 @@
 package com.college.placementportal.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
 
 @Entity
 @Table(name = "student_master")

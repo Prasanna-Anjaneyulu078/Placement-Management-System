@@ -1,6 +1,7 @@
 package com.college.placementportal.dto;
 
 public class AdminProfileDto {
+    private Long id;
     private String name;
     private String email;
     private String mobileNumber;
@@ -14,7 +15,11 @@ public class AdminProfileDto {
     
     private String profileImageUrl;
     private String role;
+    private String status;
     private String accountCreatedDate;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -51,4 +56,7 @@ public class AdminProfileDto {
     
     public String getAccountCreatedDate() { return accountCreatedDate; }
     public void setAccountCreatedDate(String accountCreatedDate) { this.accountCreatedDate = accountCreatedDate; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 }

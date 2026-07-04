@@ -13,10 +13,9 @@ import com.college.placementportal.enums.VerificationStatus;
 import com.college.placementportal.repository.AlumniRepository;
 import com.college.placementportal.repository.StudentRepository;
 import com.college.placementportal.repository.UserRepository;
-import com.college.placementportal.repository.StudentMasterRepository;
-import com.college.placementportal.entity.StudentMaster;
 import com.college.placementportal.security.JwtUtils;
 import com.college.placementportal.exception.DuplicateEntryException;
+import com.college.placementportal.exception.DocumentVerificationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -52,7 +51,7 @@ public class AuthService {
     private AlumniDocumentService alumniDocumentService;
 
     @Autowired
-    private StudentMasterRepository studentMasterRepository;
+    private DocumentVerificationService documentVerificationService;
 
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
 
@@ -109,46 +108,55 @@ public class AuthService {
 
     @Transactional
     public void registerAlumni(RegisterAlumniRequest request, MultipartFile document) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateEntryException("Error: Email is already in use!");
+        User user = null;
+        java.util.Optional<User> existingUserOpt = userRepository.findByEmail(request.getEmail());
+        if (existingUserOpt.isPresent()) {
+            user = existingUserOpt.get();
+            if (user.getRole() == Role.ALUMNI) {
+                throw new DuplicateEntryException("Error: An alumni account with this email already exists!");
+            }
+            // Update existing user role (e.g., a student also registering as alumni)
+            user.setRole(Role.ALUMNI);
+            user.setPassword(encoder.encode(request.getPassword()));
+            user.setName(request.getName());
+            user = userRepository.save(user);
         }
 
-        // Validate Roll Number
-        StudentMaster studentMaster = studentMasterRepository.findByRollNumber(request.getRollNumber())
-                .orElseThrow(() -> new RuntimeException("Roll Number not found in VVIT records. Please contact the Placement Cell."));
-
-        // Validate Name (case-insensitive and trimmed)
-        if (!studentMaster.getFullName().trim().equalsIgnoreCase(request.getName().trim())) {
-            throw new RuntimeException("Name does not match college records.");
+        // Validate Roll Number uniqueness
+        java.util.Optional<Alumni> existingAlumni = alumniRepository.findByRollNumber(request.getRollNumber());
+        if (existingAlumni.isPresent()) {
+            throw new DuplicateEntryException("An alumni account with this Roll Number already exists. Please login using your existing account or contact the administrator.");
         }
 
-        // Validate Document
+        // Validate Document presence and type
         if (document == null || document.isEmpty()) {
             throw new RuntimeException("Verification document is required.");
         }
-        
+
         long maxFileSize = 5 * 1024 * 1024; // 5 MB
         if (document.getSize() > maxFileSize) {
             throw new RuntimeException("Document size exceeds the maximum limit of 5MB.");
         }
-        
+
         String contentType = document.getContentType();
         if (contentType == null || !(contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("application/pdf"))) {
             throw new RuntimeException("Invalid document format. Only JPG, JPEG, PNG, and PDF are allowed.");
         }
 
-        User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
-        user.setPassword(encoder.encode(request.getPassword()));
-        user.setRole(Role.ALUMNI);
+        if (user == null) {
+            user = new User();
+            user.setName(request.getName());
+            user.setEmail(request.getEmail());
+            user.setPassword(encoder.encode(request.getPassword()));
+            user.setRole(Role.ALUMNI);
+        }
 
         Alumni alumni = new Alumni();
         alumni.setUser(user);
         alumni.setCompany(request.getCompany());
         alumni.setDesignation(request.getDesignation());
         alumni.setPassingYear(request.getPassingYear());
-        
+
         alumni.setRollNumber(request.getRollNumber());
         alumni.setDepartment(com.college.placementportal.enums.Department.fromString(request.getDepartment()));
         alumni.setDegree(request.getDegree());
@@ -159,8 +167,26 @@ public class AuthService {
         alumni.setVerificationStatus(VerificationStatus.PENDING);
         alumni.setProfileImageUrl("https://ui-avatars.com/api/?name=" + java.net.URLEncoder.encode(request.getName(), java.nio.charset.StandardCharsets.UTF_8) + "&background=random");
 
+        // Store document and get URL
         String documentUrl = alumniDocumentService.storeDocument(document, request.getRollNumber());
         alumni.setVerificationDocumentUrl(documentUrl);
+
+        // ---- OCR Verification (single pass) ----
+        DocumentVerificationService.OcrResult ocrResult =
+                documentVerificationService.validateRegistrationData(document, request.getName(), request.getRollNumber());
+
+        if (!ocrResult.isPassed()) {
+            // Delete stored document to avoid orphaned files
+            String fileName = documentUrl.substring(documentUrl.lastIndexOf('/') + 1);
+            alumniDocumentService.deleteDocument(fileName);
+            throw new DocumentVerificationException(ocrResult.getMessage());
+        }
+
+        // Persist OCR metadata on alumni record
+        alumni.setOcrVerified(true);
+        alumni.setOcrExtractedName(ocrResult.getExtractedName());
+        alumni.setOcrExtractedRollNumber(ocrResult.getExtractedRollNumber());
+        alumni.setOcrDetectedCollege(ocrResult.getDetectedCollege());
 
         alumniRepository.save(alumni);
     }

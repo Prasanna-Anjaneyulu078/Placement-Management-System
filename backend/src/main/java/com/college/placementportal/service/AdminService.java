@@ -34,10 +34,14 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.time.LocalDateTime;
-import com.college.placementportal.enums.AccountStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AdminService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AdminService.class);
 
     @Autowired
     private StudentRepository studentRepository;
@@ -125,9 +129,12 @@ public class AdminService {
         return alumniService.mapToDto(updated);
     }
 
+    @Transactional
     public void deleteAlumni(@NonNull Long alumniId) {
         Alumni alumni = alumniRepository.findById(alumniId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alumni", alumniId));
+
+        User user = alumni.getUser();
 
         // Delete associated document physical file
         String docUrl = alumni.getVerificationDocumentUrl();
@@ -135,22 +142,34 @@ public class AdminService {
             String fileName = docUrl.substring(docUrl.lastIndexOf('/') + 1);
             alumniDocumentService.deleteDocument(fileName);
         }
-
-        // Soft-delete the Alumni record
-        alumni.setActive(false);
-        alumni.setDeletedAt(LocalDateTime.now());
-        User admin = getCurrentAdmin();
-        alumni.setDeletedBy(admin != null ? admin.getName() : "Unknown Admin");
-
-        // Deactivate the User account to prevent login
-        if (alumni.getUser() != null) {
-            alumni.getUser().setAccountStatus(AccountStatus.DELETED);
-            userRepository.save(alumni.getUser());
+        
+        String profileUrl = alumni.getProfileImageUrl();
+        if (profileUrl != null && !profileUrl.isEmpty() && !profileUrl.startsWith("http")) {
+            String fileName = profileUrl.substring(profileUrl.lastIndexOf('/') + 1);
+            alumniDocumentService.deleteDocument(fileName);
         }
 
-        alumniRepository.save(alumni);
+        // Delete jobs posted by this alumni and their applications
+        List<Job> jobs = jobRepository.findByPostedById(user.getId());
+        if (!jobs.isEmpty()) {
+            List<Long> jobIds = jobs.stream().map(job -> job.getId()).collect(java.util.stream.Collectors.toList());
+            applicationRepository.deleteByJobIdIn(jobIds);
+            jobRepository.deleteByPostedById(user.getId());
+        }
+
+        // Delete audit logs
+        auditLogRepository.deleteByPerformedById(user.getId());
+
+        User admin = getCurrentAdmin();
+        String alumniName = user != null ? user.getName() : "Unknown";
+
+        // Hard-delete the Alumni record from the database
+        alumniRepository.delete(alumni);
         
-        logAction("ALUMNI_DELETED", "Admin " + (admin != null ? admin.getName() : "Unknown") + " deleted alumni " + (alumni.getUser() != null ? alumni.getUser().getName() : "Unknown") + " on " + LocalDateTime.now().toLocalDate());
+        // Explicitly delete the linked user account to allow re-registration
+        userRepository.delete(user);
+        
+        logAction("ALUMNI_DELETED", "Admin " + (admin != null ? admin.getName() : "Unknown") + " deleted alumni " + alumniName + " on " + LocalDateTime.now().toLocalDate());
     }
 
     public List<Job> getPendingJobs() {
@@ -231,30 +250,55 @@ public class AdminService {
     }
 
     public AdminProfileDto getAdminProfile(String email) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        AdminProfile profile = adminProfileRepository.findByUserId(user.getId()).orElse(new AdminProfile());
+        logger.info("Service: Retrieving admin profile for authenticated user email: {}", email);
+        User user = userRepository.findByEmail(email).orElseThrow(() -> {
+            logger.error("Admin user lookup failed. User not found for email: {}", email);
+            return new ResourceNotFoundException("User not found");
+        });
+        
+        logger.info("User lookup successful. User ID: {}", user.getId());
+        logger.info("Repository: Fetching AdminProfile for User ID: {}", user.getId());
+        
+        AdminProfile profile = adminProfileRepository.findByUserId(user.getId())
+            .orElseThrow(() -> {
+                logger.error("Admin profile record not found for user ID: {}", user.getId());
+                return new ResourceNotFoundException("Admin profile not found");
+            });
+
+        logger.info("Admin lookup successful. Retrieved Admin Entity: AdminProfile(id={}) for Admin ID: {}", profile.getId(), profile.getId());
+        logger.info("Starting DTO mapping...");
         
         AdminProfileDto dto = new AdminProfileDto();
-        dto.setName(user.getName());
-        dto.setEmail(user.getEmail());
-        dto.setRole(user.getRole().name());
-        dto.setAccountCreatedDate(user.getCreatedAt().toString());
+        dto.setId(user.getId());
+        dto.setName(user.getName() != null ? user.getName() : "");
+        dto.setEmail(user.getEmail() != null ? user.getEmail() : "");
+        dto.setRole(user.getRole() != null ? user.getRole().name() : "");
+        dto.setStatus(user.getAccountStatus() != null ? user.getAccountStatus().name() : "ACTIVE");
+        dto.setAccountCreatedDate(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null);
         
         dto.setMobileNumber(profile.getMobileNumber());
         dto.setLocation(profile.getLocation());
         dto.setGender(profile.getGender());
-        dto.setDepartment(profile.getDepartment() != null ? profile.getDepartment().getCode() : null);
+        dto.setDepartment(profile.getDepartment());
         dto.setDesignation(profile.getDesignation());
         dto.setEmployeeId(profile.getEmployeeId());
         dto.setOfficeLocation(profile.getOfficeLocation());
-        dto.setProfileImageUrl(profile.getProfileImageUrl());
+        dto.setProfileImageUrl(profile.getProfileImageUrl() != null && !profile.getProfileImageUrl().isEmpty() ? profile.getProfileImageUrl() : "default_profile_image.png");
         
+        logger.info("DTO mapping status: SUCCESS for Admin ID: {}", profile.getId());
         return dto;
     }
 
     public AdminProfileDto updateAdminProfile(String email, AdminProfileDto dto) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         user.setName(dto.getName());
+        
+        if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty() && !dto.getEmail().equalsIgnoreCase(user.getEmail())) {
+            if (userRepository.existsByEmail(dto.getEmail())) {
+                throw new com.college.placementportal.exception.DuplicateEntryException("This email address is already associated with another account.");
+            }
+            user.setEmail(dto.getEmail());
+        }
         userRepository.save(user);
 
         AdminProfile profile = adminProfileRepository.findByUserId(user.getId()).orElse(new AdminProfile());
@@ -262,13 +306,13 @@ public class AdminService {
         profile.setMobileNumber(dto.getMobileNumber());
         profile.setLocation(dto.getLocation());
         profile.setGender(dto.getGender());
-        profile.setDepartment(dto.getDepartment() != null ? com.college.placementportal.enums.Department.fromString(dto.getDepartment()) : null);
+        profile.setDepartment(dto.getDepartment());
         profile.setDesignation(dto.getDesignation());
         profile.setEmployeeId(dto.getEmployeeId());
         profile.setOfficeLocation(dto.getOfficeLocation());
         
         adminProfileRepository.save(profile);
-        return getAdminProfile(email);
+        return getAdminProfile(user.getEmail());
     }
 
     public void updateAdminProfileImage(String email, String imageUrl) {
@@ -276,6 +320,14 @@ public class AdminService {
         AdminProfile profile = adminProfileRepository.findByUserId(user.getId()).orElse(new AdminProfile());
         profile.setUser(user);
         profile.setProfileImageUrl(imageUrl);
+        adminProfileRepository.save(profile);
+    }
+
+    public void deleteAdminProfileImage(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        AdminProfile profile = adminProfileRepository.findByUserId(user.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("Admin profile not found"));
+        profile.setProfileImageUrl(null);
         adminProfileRepository.save(profile);
     }
 
@@ -304,7 +356,7 @@ public class AdminService {
             // Construct the full documentUrl using ServletUriComponentsBuilder
             String fullDocumentUrl = org.springframework.web.servlet.support.ServletUriComponentsBuilder.fromCurrentContextPath()
                     .path("/uploads/alumni/")
-                    .path(fileName)
+                    .path(java.util.Objects.requireNonNull(fileName))
                     .toUriString();
 
             metadata.put("documentUrl", fullDocumentUrl);

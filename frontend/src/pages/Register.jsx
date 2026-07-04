@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Briefcase, Building, ArrowRight, Eye, EyeOff, Phone, Linkedin, FileText, CreditCard, GraduationCap, UploadCloud, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, Briefcase, Building, ArrowRight, Eye, EyeOff, Phone, Linkedin, FileText, CreditCard, GraduationCap, UploadCloud, AlertCircle, CheckCircle, Loader2, ScanSearch } from 'lucide-react';
 import api from '../utils/axiosConfig';
 import useDepartments from '../hooks/useDepartments';
 
@@ -8,6 +8,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(''); // 'uploading' | 'verifying' | 'creating'
   const { departments } = useDepartments();
   const navigate = useNavigate();
 
@@ -38,25 +39,28 @@ export default function Register() {
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!formData.document) {
+      setError('Verification document is required.');
+      return;
+    }
+    if (formData.document.size > 5 * 1024 * 1024) {
+      setError('Document size exceeds the maximum limit of 5MB.');
+      return;
+    }
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(formData.document.type)) {
+      setError('Invalid file type. Please upload a PDF, JPG, JPEG, or PNG document.');
+      return;
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      if (!formData.document) {
-        setError("Verification document is required.");
-        setIsLoading(false);
-        return;
-      }
-
-      if (!formData.document) {
-        alert("Verification document is required.");
-        setIsLoading(false);
-        return;
-      }
-      if (formData.document.size > 5 * 1024 * 1024) {
-        alert("Document size exceeds the maximum limit of 5MB.");
-        setIsLoading(false);
-        return;
-      }
-
+      setLoadingStage('uploading');
       const submitData = new FormData();
       submitData.append('name', formData.fullName);
       submitData.append('email', formData.email);
@@ -72,19 +76,24 @@ export default function Register() {
       submitData.append('linkedinUrl', formData.linkedin);
       submitData.append('document', formData.document);
 
+      setLoadingStage('verifying');
       await api.post('/auth/register/alumni', submitData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: () => setLoadingStage('verifying'),
       });
-      alert('Registered successfully! Please wait for admin approval.');
+
+      setLoadingStage('creating');
+      // small delay to show success stage
+      await new Promise(r => setTimeout(r, 600));
+
+      alert('✅ Document verified and registration submitted!\nPlease wait for admin approval before you can log in.');
       navigate('/login');
-    } catch(err) {
-      const errorMessage = err.response?.data?.message || err.response?.data || err.message || "Registration failed";
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.response?.data || err.message || 'Registration failed';
       setError(errorMessage);
-      alert(errorMessage);
     } finally {
       setIsLoading(false);
+      setLoadingStage('');
     }
   };
 
@@ -388,14 +397,62 @@ export default function Register() {
               </div>
             </div>
 
+            {/* OCR Verification Loading Overlay */}
+            {isLoading && (
+              <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div className="bg-white rounded-2xl shadow-2xl p-8 mx-4 max-w-sm w-full text-center">
+                  <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    {loadingStage === 'creating' ? (
+                      <CheckCircle className="w-9 h-9 text-green-500" />
+                    ) : (
+                      <ScanSearch className="w-9 h-9 text-orange-500 animate-pulse" />
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">
+                    {loadingStage === 'uploading' && 'Uploading Document…'}
+                    {loadingStage === 'verifying' && 'Verifying Document…'}
+                    {loadingStage === 'creating' && 'Account Created!'}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-5">
+                    {loadingStage === 'uploading' && 'Securely uploading your document.'}
+                    {loadingStage === 'verifying' && 'Our system is reading your document to verify your Name, Roll Number, and VVIT affiliation. Please wait.'}
+                    {loadingStage === 'creating' && 'Redirecting you to the login page…'}
+                  </p>
+                  {/* Progress steps */}
+                  <div className="flex items-center justify-center gap-2 text-xs font-semibold">
+                    <span className={`flex items-center gap-1 px-2 py-1 rounded-full transition-all ${
+                      loadingStage !== '' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      <CheckCircle className="w-3 h-3" /> Upload
+                    </span>
+                    <span className="text-gray-300">→</span>
+                    <span className={`flex items-center gap-1 px-2 py-1 rounded-full transition-all ${
+                      loadingStage === 'verifying' || loadingStage === 'creating' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      <ScanSearch className="w-3 h-3" /> OCR Verify
+                    </span>
+                    <span className="text-gray-300">→</span>
+                    <span className={`flex items-center gap-1 px-2 py-1 rounded-full transition-all ${
+                      loadingStage === 'creating' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      <CheckCircle className="w-3 h-3" /> Done
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <button 
               type="submit" 
               disabled={isLoading}
               className={`w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-xl shadow-lg text-base font-bold text-white transition-all duration-200 mt-8 btn btn-primary
                 ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:-translate-y-0.5'}`}
             >
-              {isLoading ? 'Creating Account...' : 'Create Alumni Account'}
-              {!isLoading && <ArrowRight className="w-5 h-5 ml-2" />}
+              {isLoading ? (
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing…</>
+              ) : (
+                <>Create Alumni Account <ArrowRight className="w-5 h-5 ml-2" /></>
+              )}
             </button>
           </form>
 

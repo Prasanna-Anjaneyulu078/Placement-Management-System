@@ -24,7 +24,14 @@ import com.college.placementportal.dto.response.ProjectDto;
 import com.college.placementportal.entity.Application;
 import com.college.placementportal.entity.Skill;
 import com.college.placementportal.entity.Project;
+import com.college.placementportal.entity.Alumni;
+import com.college.placementportal.entity.Job;
 import com.college.placementportal.enums.ApplicationStatus;
+import com.college.placementportal.repository.AlumniRepository;
+import com.college.placementportal.repository.JobRepository;
+import com.college.placementportal.repository.AuditLogRepository;
+import java.security.Principal;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -68,6 +75,18 @@ public class AdminUserManagementService {
 
     @Autowired
     private AuditLogService auditLogService;
+
+    @Autowired
+    private AlumniRepository alumniRepository;
+
+    @Autowired
+    private JobRepository jobRepository;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    @Autowired
+    private AlumniDocumentService alumniDocumentService;
 
     @Transactional
     public void deleteStudent(@NonNull Long studentId) {
@@ -141,7 +160,7 @@ public class AdminUserManagementService {
         admin.setUser(user);
         admin.setMobileNumber(request.getMobileNumber());
         admin.setDesignation(request.getDesignation());
-        admin.setDepartment(com.college.placementportal.enums.Department.fromString(request.getDepartment()));
+        admin.setDepartment(request.getDepartment());
         admin.setProfileImageUrl("https://ui-avatars.com/api/?name=" + java.net.URLEncoder.encode(request.getName(), java.nio.charset.StandardCharsets.UTF_8) + "&background=random");
         
         adminProfileRepository.save(admin);
@@ -226,6 +245,45 @@ public class AdminUserManagementService {
     }
     
     @Transactional
+    public void hardDeleteAlumni(@NonNull Long alumniId, Principal principal) {
+        Alumni alumni = alumniRepository.findById(alumniId)
+            .orElseThrow(() -> new ResourceNotFoundException("Alumni not found"));
+            
+        User user = alumni.getUser();
+        
+        // Delete files
+        if (alumni.getProfileImageUrl() != null && !alumni.getProfileImageUrl().isEmpty() && !alumni.getProfileImageUrl().startsWith("http")) {
+            String fileName = alumni.getProfileImageUrl().substring(alumni.getProfileImageUrl().lastIndexOf("/") + 1);
+            alumniDocumentService.deleteDocument(fileName);
+        }
+        if (alumni.getVerificationDocumentUrl() != null && !alumni.getVerificationDocumentUrl().isEmpty() && !alumni.getVerificationDocumentUrl().startsWith("http")) {
+            String fileName = alumni.getVerificationDocumentUrl().substring(alumni.getVerificationDocumentUrl().lastIndexOf("/") + 1);
+            alumniDocumentService.deleteDocument(fileName);
+        }
+        
+        // Delete jobs posted by this alumni and their applications
+        List<Job> jobs = jobRepository.findByPostedById(user.getId());
+        if (!jobs.isEmpty()) {
+            List<Long> jobIds = jobs.stream().map(job -> job.getId()).collect(Collectors.toList());
+            applicationRepository.deleteByJobIdIn(jobIds);
+            jobRepository.deleteByPostedById(user.getId());
+        }
+        
+        // Delete audit logs
+        auditLogRepository.deleteByPerformedById(user.getId());
+        
+        // Delete Alumni
+        alumniRepository.delete(alumni);
+        
+        // Explicitly delete User
+        userRepository.delete(user);
+        
+        // Log deletion
+        String adminName = principal != null ? principal.getName() : "System Admin";
+        auditLogService.logAction("Alumni Permanently Deleted", "Hard deleted alumni: " + user.getName() + " (Roll: " + alumni.getRollNumber() + ") by " + adminName);
+    }
+    
+    @Transactional
     public boolean verifyStudent(@NonNull Long studentId) {
         Student student = studentRepository.findById(studentId)
             .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
@@ -283,7 +341,7 @@ public class AdminUserManagementService {
                 failed++;
             }
         }
-        userRepository.saveAll(students.stream().map(Student::getUser).collect(Collectors.toList()));
+        userRepository.saveAll(Objects.requireNonNull(students.stream().filter(s -> s != null).map(s -> s.getUser()).filter(Objects::nonNull).collect(Collectors.toList())));
         return java.util.Map.of("updated", updated, "failed", failed);
     }
     

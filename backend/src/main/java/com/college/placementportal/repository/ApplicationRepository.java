@@ -14,4 +14,8 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     Optional<Application> findByJobIdAndStudentId(Long jobId, Long studentId);
     List<Application> findByStatusIn(List<com.college.placementportal.enums.ApplicationStatus> statuses);
     long countByStatus(com.college.placementportal.enums.ApplicationStatus status);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Application a WHERE a.job.id IN :jobIds")
+    void deleteByJobIdIn(@org.springframework.data.repository.query.Param("jobIds") List<Long> jobIds);
 }
