@@ -1,0 +1,45 @@
+.admin-section-title-icon {
+  color: #f59e0b;
+}
+
+.admin-view-all {
+  font-size: 0.875rem;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-view-all:hover {
+  text-decoration: underline;
+}
+
+.admin-section-card {
+  margin-bottom: 1.5rem;
+}
+
+.admin-job-item {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-job-item:last-child {
+  border-bottom: none;
+}
+
+.admin-reject-btn-custom {
+  color: var(--danger);
+}
+
+.admin-reject-btn-custom:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.admin-empty-text {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
