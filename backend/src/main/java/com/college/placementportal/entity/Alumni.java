@@ -37,6 +37,16 @@ public class Alumni {
     private String profileImageUrl;
 
     private String verificationDocumentUrl;
+    
+    @Column(name = "verification_document_name")
+    private String verificationDocumentName;
+    
+    @Column(name = "verification_document_upload_date")
+    private LocalDateTime verificationDocumentUploadDate;
+
+
+    @Column(name = "is_active")
+    private Boolean isActive = true;
 
     @Column(columnDefinition = "TEXT")
     private String rejectionReason;
@@ -187,5 +197,29 @@ public class Alumni {
 
     public void setOcrDetectedCollege(String ocrDetectedCollege) {
         this.ocrDetectedCollege = ocrDetectedCollege;
+    }
+
+    public Boolean getIsActive() {
+        return isActive != null ? isActive : true;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
+    }
+
+    public String getVerificationDocumentName() {
+        return verificationDocumentName;
+    }
+
+    public void setVerificationDocumentName(String verificationDocumentName) {
+        this.verificationDocumentName = verificationDocumentName;
+    }
+
+    public LocalDateTime getVerificationDocumentUploadDate() {
+        return verificationDocumentUploadDate;
+    }
+
+    public void setVerificationDocumentUploadDate(LocalDateTime verificationDocumentUploadDate) {
+        this.verificationDocumentUploadDate = verificationDocumentUploadDate;
     }
 }

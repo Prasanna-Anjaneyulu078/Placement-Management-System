@@ -121,7 +121,7 @@ public class DocumentVerificationService {
 
         if (detectedCollege == null) {
             result.setPassed(false);
-            result.setMessage("Uploaded document does not appear to belong to VVIT/VVITU. Please upload a valid VVIT document.");
+            result.setMessage("You're not a student in VVIT.");
             return result;
         }
 

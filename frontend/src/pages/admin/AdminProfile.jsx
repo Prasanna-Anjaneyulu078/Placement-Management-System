@@ -1,15 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { generateAvatarSVG } from '../../utils/avatarUtils';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { Camera, Edit2, Shield, Lock, MapPin, Mail, Phone, Briefcase, User, Calendar, CheckCircle, Upload } from 'lucide-react';
-import { Button, Input, LoadingSpinner, Avatar } from '../../components/common';
+import { 
+  Camera, Edit2, Shield, Lock, MapPin, Mail, Phone, Briefcase, 
+  User, Calendar, CheckCircle, ShieldCheck, Save, X, Users, 
+  GraduationCap, Briefcase as BriefcaseIcon, Clock, Settings
+} from 'lucide-react';
+import { Button, Input, LoadingSpinner, Modal } from '../../components/common';
 import { toast } from 'react-toastify';
 import api from '../../utils/axiosConfig';
-import '../student/StudentProfile.css';
 import useDepartments from '../../hooks/useDepartments';
 
 export default function AdminProfile() {
+  const navigate = useNavigate();
   const { departments } = useDepartments();
   const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
@@ -17,28 +24,35 @@ export default function AdminProfile() {
   
   const [personalForm, setPersonalForm] = useState({});
   const [professionalForm, setProfessionalForm] = useState({});
-  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   
   const [isSaving, setIsSaving] = useState(false);
-  const fileInputRef = useRef(null);
+  const [showPersonalModal, setShowPersonalModal] = useState(false);
 
   useEffect(() => {
-    fetchProfile();
+    fetchData();
   }, []);
 
-  const fetchProfile = async () => {
+  const fetchData = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/admin/profile');
-      setProfile(res.data);
+      const [profileRes, statsRes] = await Promise.all([
+        api.get('/admin/profile'),
+        api.get('/admin/stats').catch(() => ({ data: null }))
+      ]);
+      
+      setProfile(profileRes.data);
+      if (statsRes.data) setStats(statsRes.data);
+      
       setPersonalForm({
-        name: res.data.name || '',
-        email: res.data.email || '',
-        mobileNumber: res.data.mobileNumber || ''
+        name: profileRes.data.name || '',
+        email: profileRes.data.email || '',
+        mobileNumber: profileRes.data.mobileNumber || '',
+        gender: profileRes.data.gender || ''
       });
       setProfessionalForm({
-        department: res.data.department || '',
-        designation: res.data.designation || ''
+        department: profileRes.data.department || '',
+        designation: profileRes.data.designation || '',
+        employeeId: profileRes.data.employeeId || ''
       });
     } catch (err) {
       toast.error('Failed to load profile data');
@@ -67,8 +81,6 @@ export default function AdminProfile() {
       });
       setProfile(prev => ({ ...prev, profileImageUrl: res.data.imageUrl }));
       toast.success('Profile image uploaded successfully');
-      
-      // Dispatch an event to notify the Navbar to update its image
       window.dispatchEvent(new CustomEvent('profileImageUpdated', { detail: res.data.imageUrl }));
     } catch (err) {
       toast.error('Failed to upload image');
@@ -81,8 +93,10 @@ export default function AdminProfile() {
       setIsSaving(true);
       const emailChanged = profile?.email && personalForm.email !== profile.email;
       const updatedData = { ...profile, ...personalForm, ...professionalForm };
-      const res = await api.put('/admin/profile', updatedData);
-      setProfile(res.data);
+      
+      await api.put('/admin/profile', updatedData);
+      setProfile(updatedData);
+      
       if (formType === 'personal' && emailChanged) {
         toast.success('Email updated successfully. Please log in again if your session expires.');
       } else {
@@ -93,32 +107,6 @@ export default function AdminProfile() {
     } catch (err) {
       toast.error('Failed to save profile');
       console.error(err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const changePassword = async (e) => {
-    e.preventDefault();
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error('New passwords do not match');
-      return;
-    }
-    if (passwordForm.newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      await api.put('/admin/change-password', {
-        currentPassword: passwordForm.currentPassword,
-        newPassword: passwordForm.newPassword
-      });
-      toast.success('Password changed successfully');
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Password update failed');
     } finally {
       setIsSaving(false);
     }
@@ -137,205 +125,268 @@ export default function AdminProfile() {
   const hasPersonalChanges = JSON.stringify(personalForm) !== JSON.stringify({
     name: profile?.name || '',
     email: profile?.email || '',
-    mobileNumber: profile?.mobileNumber || ''
+    mobileNumber: profile?.mobileNumber || '',
+    gender: profile?.gender || ''
   });
 
   const hasProfessionalChanges = JSON.stringify(professionalForm) !== JSON.stringify({
     department: profile?.department || '',
-    designation: profile?.designation || ''
+    designation: profile?.designation || '',
+    employeeId: profile?.employeeId || ''
   });
+
+  const actionBtnStyle = "py-2.5 px-4 bg-white border border-[#F47C20] text-[#F47C20] rounded-xl text-sm font-bold hover:bg-[#FFF4EB] focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm cursor-pointer w-full";
 
   return (
     <DashboardLayout role="admin">
-      <div className="profile-container">
-        {/* Profile Header */}
-        <div className="profile-header-card">
-          <div className="profile-header-bg"></div>
-          <div className="profile-header-content">
-            <div className="profile-header-avatar-container" style={{position: 'relative'}}>
-              <Avatar 
-                size="xl" 
-                src={profile?.profileImageUrl || `https://ui-avatars.com/api/?name=${profile?.name || 'Admin'}&background=0A4D8C&color=fff`}
-                alt={profile?.name || 'Admin'}
-                className="profile-header-avatar"
-              />
-              <label className="avatar-upload-overlay" title="Upload Profile Picture">
-                <Edit2 size={16} color="white" />
-                <input 
-                  type="file" 
-                  accept="image/jpeg, image/png, image/webp" 
-                  style={{ display: 'none' }} 
-                  onChange={handleImageUpload}
-                />
-              </label>
-            </div>
+      <div className="w-full max-w-7xl mx-auto space-y-6 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* LEFT COLUMN */}
+          <div className="lg:col-span-4 flex flex-col gap-6">
             
-            <div className="profile-header-info flex-col lg:flex-row">
-              <div className="flex-1">
-                <h1 className="profile-name flex items-center gap-2">
-                  {profile?.name || 'Administrator'}
-                  <Shield size={24} fill="#F47C20" color="white" title="Admin" />
-                </h1>
-                <p className="profile-subtitle">{profile?.designation || 'System Administrator'} | {profile?.department || 'Placement Cell'}</p>
+            {/* Identity Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+              <div className="h-32 bg-gradient-to-r from-slate-800 to-slate-700 relative">
+                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px' }}></div>
+              </div>
+              <div className="px-6 pb-6 relative text-center">
+                <div className="flex justify-center -mt-16 mb-4 relative z-10">
+                  <div className="relative group">
+                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-md bg-white">
+                      <img 
+                        src={profile?.profileImageUrl || generateAvatarSVG(profile?.name || 'Admin', 'F47C20', 'fff')} 
+                        onError={(e) => { e.target.onerror = null; e.target.src = generateAvatarSVG(profile?.name || 'Admin', 'F47C20', 'fff'); }}
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <label className="absolute bottom-1 right-1 w-9 h-9 bg-[#F47C20] rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-[#E06915] hover:scale-110 transition-all border-2 border-white" title="Change Profile Picture">
+                      <Camera size={16} />
+                      <input 
+                        type="file" 
+                        accept="image/jpeg, image/png, image/webp" 
+                        className="hidden" 
+                        onChange={handleImageUpload}
+                      />
+                    </label>
+                  </div>
+                </div>
                 
-                <div className="profile-links">
-                  {profile?.email && <span className="profile-link-item"><Mail size={14}/> {profile.email}</span>}
-                  {profile?.mobileNumber && <span className="profile-link-item"><Phone size={14}/> {profile.mobileNumber}</span>}
+                <h2 className="text-xl font-extrabold text-slate-800 tracking-tight flex justify-center items-center gap-2">
+                  {profile?.name || 'Administrator'}
+                  <ShieldCheck size={20} className="text-[#F47C20]"/>
+                </h2>
+                <p className="text-sm font-semibold text-[#F47C20] mt-1">{profile?.designation || 'System Administrator'}</p>
+                <p className="text-sm font-medium text-slate-500 mt-1">{profile?.department || 'Placement Cell'}</p>
+                <p className="text-sm font-medium text-slate-500 mt-1">{profile?.email || 'admin@vvit.edu.in'}</p>
+                
+                <div className="mt-5 flex items-center justify-center gap-3">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs font-bold uppercase tracking-wider">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Active Account
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="flex flex-col gap-6 mt-2">
-          {/* SECTION 1: Personal Information */}
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <div className="flex justify-between items-center mb-6 border-b pb-3">
-              <h2 className="text-xl font-bold text-gray-800">Personal Information</h2>
-              {!isEditingPersonal && (
-                <Button variant="outline" size="sm" onClick={() => setIsEditingPersonal(true)}>
-                  <Edit2 size={14} className="mr-1" /> Edit
-                </Button>
-              )}
-            </div>
-            
-            {isEditingPersonal ? (
-              <form onSubmit={(e) => { e.preventDefault(); saveProfile('personal'); }} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Input label="Full Name" value={personalForm.name} onChange={e => setPersonalForm({...personalForm, name: e.target.value})} required />
-                  <Input label="Email" type="email" value={personalForm.email} onChange={e => setPersonalForm({...personalForm, email: e.target.value})} required />
-                  <Input label="Mobile Number" value={personalForm.mobileNumber} onChange={e => setPersonalForm({...personalForm, mobileNumber: e.target.value})} />
+            {/* Quick Stats Dashboard */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <h3 className="text-sm font-bold text-[#F47C20] uppercase tracking-wider mb-4 flex items-center gap-2">
+                <ShieldCheck size={16}/> Quick Stats
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-col items-center text-center hover:border-[#F47C20]/30 transition-colors">
+                  <Users size={18} className="text-[#F47C20] mb-2" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Students Managed</span>
+                  <span className="text-lg font-black text-slate-800 mt-1">{stats?.totalStudents || 0}</span>
                 </div>
-                <div className="flex justify-end pt-4 border-t border-gray-100 gap-3">
-                  <Button type="button" variant="ghost" onClick={() => setIsEditingPersonal(false)}>Cancel</Button>
-                  <Button type="submit" variant="primary" disabled={!hasPersonalChanges || isSaving}>
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </Button>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-col items-center text-center hover:border-emerald-500/30 transition-colors">
+                  <CheckCircle size={18} className="text-emerald-500 mb-2" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verified Students</span>
+                  <span className="text-lg font-black text-slate-800 mt-1">{stats?.totalVerifiedStudents || 0}</span>
                 </div>
-              </form>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
-                <div>
-                  <span className="text-xs text-gray-500 uppercase font-semibold">Full Name</span>
-                  <p className="font-medium text-gray-800 mt-1">{profile?.name || '-'}</p>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-col items-center text-center hover:border-[#F47C20]/30 transition-colors">
+                  <GraduationCap size={18} className="text-[#F47C20] mb-2" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Alumni Verified</span>
+                  <span className="text-lg font-black text-slate-800 mt-1">{stats?.totalVerifiedAlumni || 0}</span>
                 </div>
-                <div>
-                  <span className="text-xs text-gray-500 uppercase font-semibold">Email</span>
-                  <p className="font-medium text-gray-800 mt-1">{profile?.email || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500 uppercase font-semibold">Mobile Number</span>
-                  <p className="font-medium text-gray-800 mt-1">{profile?.mobileNumber || '-'}</p>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-col items-center text-center hover:border-blue-500/30 transition-colors">
+                  <BriefcaseIcon size={18} className="text-blue-500 mb-2" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Jobs</span>
+                  <span className="text-lg font-black text-slate-800 mt-1">{stats?.activeJobs || stats?.totalJobs || 0}</span>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* SECTION 2: Professional Information */}
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <div className="flex justify-between items-center mb-6 border-b pb-3">
-              <h2 className="text-xl font-bold text-gray-800">Professional Information</h2>
-              {!isEditingProfessional && (
-                <Button variant="outline" size="sm" onClick={() => setIsEditingProfessional(true)}>
-                  <Edit2 size={14} className="mr-1" /> Edit
-                </Button>
-              )}
             </div>
-            
-            {isEditingProfessional ? (
-              <form onSubmit={(e) => { e.preventDefault(); saveProfile('professional'); }} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Input label="Department" value={professionalForm.department} onChange={e => setProfessionalForm({...professionalForm, department: e.target.value})} placeholder="e.g. Training & Placement Cell" />
-                  </div>
-                  <Input label="Designation" value={professionalForm.designation} onChange={e => setProfessionalForm({...professionalForm, designation: e.target.value})} />
-                </div>
-                <div className="flex justify-end pt-4 border-t border-gray-100 gap-3">
-                  <Button type="button" variant="ghost" onClick={() => setIsEditingProfessional(false)}>Cancel</Button>
-                  <Button type="submit" variant="primary" disabled={!hasProfessionalChanges || isSaving}>
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
-                <div>
-                  <span className="text-xs text-gray-500 uppercase font-semibold">Department</span>
-                  <p className="font-medium text-gray-800 mt-1">{profile?.department || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500 uppercase font-semibold">Designation</span>
-                  <p className="font-medium text-gray-800 mt-1">{profile?.designation || '-'}</p>
-                </div>
-              </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* SECTION 3: Account Information */}
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-3">Account Information</h2>
+            {/* Contact Details */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Mail size={14}/> Contact Details</h3>
+                <button onClick={() => setShowPersonalModal(true)} className="px-2 py-1 bg-white border border-[#F47C20] text-[#F47C20] rounded-md text-[10px] font-bold uppercase tracking-wider hover:bg-[#FFF4EB] focus:ring-2 focus:ring-[#F47C20] transition-all flex items-center gap-1 shadow-sm">
+                  <Edit2 size={10} /> Edit
+                </button>
+              </div>
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><Shield size={18} /></div>
-                  <div>
-                    <span className="text-xs text-gray-500 uppercase font-semibold">Role</span>
-                    <p className="font-medium text-gray-800">{profile?.role || 'ADMIN'}</p>
+                <div className="flex items-center gap-3 text-sm font-semibold text-slate-600"><Mail size={16} className="text-slate-400 shrink-0"/> <span className="truncate break-all">{profile?.email || 'N/A'}</span></div>
+                <div className="flex items-center gap-3 text-sm font-semibold text-slate-600"><Phone size={16} className="text-slate-400 shrink-0"/> <span>{profile?.mobileNumber || 'Not Specified'}</span></div>
+                <div className="flex items-center gap-3 text-sm font-semibold text-slate-600"><User size={16} className="text-slate-400 shrink-0"/> <span>{profile?.gender || 'Not Specified'}</span></div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            
+            {/* Professional Information */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                 <h4 className="font-bold text-[#F47C20] text-sm uppercase tracking-wider flex items-center gap-2"><BriefcaseIcon size={16}/> Professional Information</h4>
+                 {!isEditingProfessional && (
+                   <button onClick={() => setIsEditingProfessional(true)} className="px-3 py-1.5 bg-white border border-[#F47C20] text-[#F47C20] rounded-lg text-[11px] font-bold uppercase tracking-wider hover:bg-[#FFF4EB] focus:ring-2 focus:ring-[#F47C20] transition-all flex items-center gap-1.5 shadow-sm">
+                     <Edit2 size={12} /> Edit Details
+                   </button>
+                 )}
+              </div>
+              <div className="p-6">
+                {isEditingProfessional ? (
+                  <form onSubmit={(e) => { e.preventDefault(); saveProfile('professional'); }}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Department</label>
+                        <select value={professionalForm.department} onChange={e => setProfessionalForm({...professionalForm, department: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all cursor-pointer">
+                          <option value="">Select Department</option>
+                          <option value="Placement Cell">Placement Cell</option>
+                          {departments.map(d => <option key={d.code || d.name} value={d.name}>{d.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Designation</label>
+                        <input type="text" value={professionalForm.designation} onChange={e => setProfessionalForm({...professionalForm, designation: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Employee ID</label>
+                        <input type="text" value={professionalForm.employeeId} onChange={e => setProfessionalForm({...professionalForm, employeeId: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                      <button type="button" onClick={() => setIsEditingProfessional(false)} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-1.5"><X size={16}/> Cancel</button>
+                      <button type="submit" disabled={!hasProfessionalChanges || isSaving} className={actionBtnStyle + " w-auto px-6"}>
+                        <Save size={16}/> {isSaving ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Department</p>
+                      <p className="text-sm font-extrabold text-slate-800">{profile?.department || 'Not Specified'}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Designation</p>
+                      <p className="text-sm font-extrabold text-slate-800">{profile?.designation || 'Not Specified'}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Employee ID</p>
+                      <p className="text-sm font-extrabold text-slate-800">{profile?.employeeId || 'Not Specified'}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Account Information */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                 <h4 className="font-bold text-[#F47C20] text-sm uppercase tracking-wider flex items-center gap-2"><Shield size={16}/> Account Information</h4>
+              </div>
+              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col items-start">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Account Status</p>
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200"><CheckCircle size={12}/> Active</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col items-start">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Created Date</p>
+                  <span className="text-sm font-extrabold text-slate-800 mt-auto">{profile?.accountCreatedDate ? new Date(profile.accountCreatedDate).toLocaleDateString() : 'N/A'}</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col items-start">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Last Login</p>
+                  <div className="text-sm font-extrabold text-slate-800 flex items-start gap-1.5 mt-auto">
+                    <Clock size={14} className="text-slate-400 shrink-0 mt-0.5"/>
+                    <div className="flex flex-col leading-tight">
+                      <span>{profile?.lastLogin ? new Date(profile.lastLogin).toLocaleDateString() : new Date().toLocaleDateString()}</span>
+                      <span className="text-[11px] text-slate-500 font-bold">{profile?.lastLogin ? new Date(profile.lastLogin).toLocaleTimeString() : new Date().toLocaleTimeString()}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-50 rounded-lg text-green-600"><CheckCircle size={18} /></div>
-                  <div>
-                    <span className="text-xs text-gray-500 uppercase font-semibold">Account Status</span>
-                    <p className="font-medium text-gray-800">Verified</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gray-50 rounded-lg text-gray-600"><Calendar size={18} /></div>
-                  <div>
-                    <span className="text-xs text-gray-500 uppercase font-semibold">Created Date</span>
-                    <p className="font-medium text-gray-800">{profile?.accountCreatedDate ? new Date(profile.accountCreatedDate).toLocaleDateString() : '-'}</p>
-                  </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col items-start">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Role</p>
+                  <span className="text-sm font-extrabold text-slate-800 uppercase mt-auto">{profile?.role || 'ADMIN'}</span>
                 </div>
               </div>
             </div>
 
-            {/* SECTION 4: Security Settings */}
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-3">Security</h2>
-              <form onSubmit={changePassword} className="space-y-4">
-                <Input 
-                  label="Current Password" 
-                  type="password" 
-                  value={passwordForm.currentPassword}
-                  onChange={e => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
-                  required
-                />
-                <Input 
-                  label="New Password" 
-                  type="password" 
-                  value={passwordForm.newPassword}
-                  onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
-                  required
-                  placeholder="Minimum 8 characters"
-                />
-                <Input 
-                  label="Confirm New Password" 
-                  type="password" 
-                  value={passwordForm.confirmPassword}
-                  onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
-                  required
-                />
-                <div className="pt-2">
-                  <Button type="submit" variant="primary" disabled={isSaving || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword} className="w-full">
-                    {isSaving ? 'Updating...' : 'Change Password'}
-                  </Button>
+            {/* Administrative Controls */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                 <h4 className="font-bold text-[#F47C20] text-sm uppercase tracking-wider flex items-center gap-2"><Settings size={16}/> Administrative Controls</h4>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <button onClick={() => navigate('/admin/users/students')} className={actionBtnStyle}>
+                    <Users size={16}/> Manage Students
+                  </button>
+                  <button onClick={() => navigate('/admin/alumni')} className={actionBtnStyle}>
+                    <GraduationCap size={16}/> Manage Alumni
+                  </button>
+                  <button onClick={() => navigate('/admin/jobs')} className={actionBtnStyle}>
+                    <BriefcaseIcon size={16}/> Manage Jobs
+                  </button>
                 </div>
-              </form>
+              </div>
             </div>
+
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <Modal isOpen={showPersonalModal} onClose={() => setShowPersonalModal(false)} title="Edit Personal Information">
+        <form onSubmit={(e) => { 
+          e.preventDefault(); 
+          saveProfile('personal').then(() => setShowPersonalModal(false)); 
+        }}>
+          <div className="grid grid-cols-1 gap-4 mb-4">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Full Name</label>
+              <input type="text" value={personalForm.name || ''} onChange={e => setPersonalForm({...personalForm, name: e.target.value})} required className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Email</label>
+              <input type="email" value={personalForm.email || ''} onChange={e => setPersonalForm({...personalForm, email: e.target.value})} required className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Mobile Number</label>
+              <input type="text" value={personalForm.mobileNumber || ''} onChange={e => setPersonalForm({...personalForm, mobileNumber: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Gender</label>
+              <select value={personalForm.gender || ''} onChange={e => setPersonalForm({...personalForm, gender: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all cursor-pointer">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button type="button" onClick={() => setShowPersonalModal(false)} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors">Cancel</button>
+            <button type="submit" disabled={!hasPersonalChanges || isSaving} className="px-5 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] rounded-xl text-sm font-bold hover:bg-[#FFF4EB] transition-all shadow-sm flex items-center justify-center gap-2">
+              <Save size={16}/> {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </DashboardLayout>
   );
 }

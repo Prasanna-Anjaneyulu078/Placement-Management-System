@@ -58,18 +58,18 @@ export default function AdminDashboard() {
         <div className="space-y-8 mt-6">
           
           {/* STATS GRID */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {statCards.map((card, idx) => (
               <div 
                 key={idx} 
                 onClick={() => navigate(card.link)}
-                className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex items-center justify-between cursor-pointer hover:bg-[#FFF4EB] hover:border-[#F47C20] hover:shadow-md transition-all group"
+                className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-center justify-between cursor-pointer hover:border-[#F47C20] hover:shadow-md transition-all group h-[88px]"
               >
                 <div>
-                  <p className="text-sm font-semibold text-gray-500 mb-1">{card.title}</p>
-                  <p className="text-3xl font-bold text-gray-900">{card.value}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{card.title}</p>
+                  <p className="text-2xl font-extrabold text-slate-800 tracking-tight">{card.value}</p>
                 </div>
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${card.color} group-hover:scale-110 transition-transform`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${card.color} group-hover:scale-110 transition-transform shrink-0`}>
                   {card.icon}
                 </div>
               </div>

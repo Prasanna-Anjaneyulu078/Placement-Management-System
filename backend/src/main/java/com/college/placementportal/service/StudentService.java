@@ -8,6 +8,7 @@ import com.college.placementportal.exception.ResourceNotFoundException;
 import com.college.placementportal.dto.response.StudentResponseDto;
 import com.college.placementportal.dto.response.UserSummaryDto;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -38,6 +39,10 @@ public class StudentService {
 
     public Student getStudentEntity(Long userId) {
         return studentRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("Student profile not found for user ID: " + userId));
+    }
+
+    public Student getStudentEntityById(@NonNull Long studentId) {
+        return studentRepository.findById(studentId).orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + studentId));
     }
 
     public StudentResponseDto getStudentProfile(Long userId) {

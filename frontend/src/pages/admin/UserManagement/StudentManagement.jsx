@@ -12,6 +12,7 @@ import {
 import { toast } from "react-toastify";
 import ExportDataModal from "./ExportDataModal";
 import useDepartments from "../../../hooks/useDepartments";
+import { DocumentViewerModal } from "../../../components/common";
 
 const Avatar = ({ name, src, size = "md" }) => {
   const sz = size === "lg" ? "w-20 h-20 text-3xl rounded-2xl" : "w-10 h-10 text-sm rounded-full";
@@ -56,6 +57,11 @@ export default function StudentManagement() {
   const [removeConfirmText, setRemoveConfirmText] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // Document Viewer State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState(null);
+  const [viewerMetadata, setViewerMetadata] = useState(null);
+
   // Import state
   const [selectedFile, setSelectedFile]         = useState(null);
   const [importing, setImporting]               = useState(false);
@@ -80,6 +86,64 @@ export default function StudentManagement() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting]         = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
+
+  // ── Admin Resume Handlers ─────────────────────────────────────────────────
+  const handleAdminViewResume = async (student) => {
+    try {
+      const res = await api.get(`/admin/students/${student.id}/resume/view`, { responseType: 'blob' });
+      const disposition = res.headers['content-disposition'] || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `${student.rollNumber || 'Student'}_Resume.pdf`;
+      const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/pdf' });
+      const url  = URL.createObjectURL(blob);
+      
+      setViewerUrl(url);
+      setViewerMetadata({
+        fileName: filename,
+        studentName: student.user?.name || student.name || 'Unknown Student',
+        rollNumber: student.rollNumber
+      });
+      setViewerOpen(true);
+    } catch {
+      toast.error('Failed to view resume.');
+    }
+  };
+
+  const closeDocumentViewer = () => {
+    setViewerOpen(false);
+    if (viewerUrl) {
+      URL.revokeObjectURL(viewerUrl);
+      setViewerUrl(null);
+    }
+    setViewerMetadata(null);
+  };
+
+  const handleAdminDownloadResume = async (studentId, rollNumber) => {
+    try {
+      const res = await api.get(`/admin/students/${studentId}/resume/download`, { responseType: 'blob' });
+      // Try to read standardized filename from Content-Disposition header
+      const disposition = res.headers['content-disposition'] || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `${rollNumber || 'Student'}_Resume.pdf`;
+      const url  = URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download resume.');
+    }
+  };
+
+  /** Validate if a URL string is a well-formed http/https URL */
+  const isValidUrl = (url) => {
+    if (!url || !url.trim()) return false;
+    try { const u = new URL(url); return u.protocol === 'http:' || u.protocol === 'https:'; }
+    catch { return false; }
+  };
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -317,15 +381,17 @@ export default function StudentManagement() {
     setImportError(null);
   };
 
-  const actionBtn = "inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-semibold text-sm rounded-xl hover:bg-[#FFF4EB] active:scale-95 transition-all shadow-sm focus:outline-none whitespace-nowrap";
+  const actionBtn = "inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#F47C20] text-[#F47C20] font-semibold text-xs rounded-lg hover:bg-[#FFF4EB] active:scale-95 transition-all shadow-sm focus:outline-none whitespace-nowrap";
   const inputCls  = "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-2 focus:ring-[#F47C20]/20 transition-all";
 
   const StatCard = ({ title, count, icon: Icon, palette, active, onClick }) => (
-    <button onClick={onClick} className={`group relative w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 overflow-hidden shadow-sm hover:-translate-y-0.5 hover:shadow-md focus:outline-none ${active ? `border-[#F47C20] ${palette.bg}` : "bg-white border-transparent hover:border-slate-200"}`}>
-      <div className={`absolute top-4 right-4 w-10 h-10 rounded-xl flex items-center justify-center ${palette.icon}`}><Icon size={20} /></div>
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">{title}</p>
-      <p className={`text-4xl font-extrabold tracking-tight ${palette.text}`}>{count}</p>
-      {active && <div className="absolute bottom-0 left-0 h-1 w-full bg-[#F47C20] rounded-b-xl" />}
+    <button onClick={onClick} className={`group relative w-full text-left p-4 rounded-xl border transition-all duration-200 overflow-hidden shadow-sm hover:shadow-md focus:outline-none flex items-center justify-between h-[76px] ${active ? `border-[#F47C20] ${palette.bg}` : "bg-white border-slate-200 hover:border-[#F47C20]/50"}`}>
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{title}</p>
+        <p className={`text-2xl font-extrabold tracking-tight ${palette.text}`}>{count}</p>
+      </div>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${palette.icon}`}><Icon size={18} /></div>
+      {active && <div className="absolute bottom-0 left-0 h-1 w-full bg-[#F47C20]" />}
     </button>
   );
 
@@ -334,97 +400,73 @@ export default function StudentManagement() {
   return (
     <DashboardLayout role="admin">
 
-      {/* HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8 pb-6 border-b border-slate-100">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Manage Students</h1>
-          <p className="text-slate-400 text-sm mt-0.5 font-medium">View, verify, and manage all student records.</p>
-        </div>
-        <div className="flex flex-row flex-wrap sm:flex-nowrap gap-2.5 flex-shrink-0">
-          <button onClick={() => setShowAddModal(true)} className={actionBtn}><Plus size={16}/>Add Student</button>
-          <button onClick={() => setShowImportModal(true)} className={actionBtn}><Upload size={16}/>Import</button>
-          <button onClick={() => setShowExportModal(true)} className={actionBtn}><Download size={16}/>Export</button>
-        </div>
+      {/* ACTION BUTTONS */}
+      <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-4 mb-6 w-full">
+        <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] text-sm font-bold rounded-xl hover:bg-[#FFF4EB] transition-all shadow-sm flex-1 sm:flex-none min-w-[140px]">
+          <Plus size={16}/> Add Student
+        </button>
+        <button onClick={() => setShowImportModal(true)} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] text-sm font-bold rounded-xl hover:bg-[#FFF4EB] transition-all shadow-sm flex-1 sm:flex-none min-w-[140px]">
+          <Upload size={16}/> Import
+        </button>
+        <button onClick={() => setShowExportModal(true)} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] text-sm font-bold rounded-xl hover:bg-[#FFF4EB] transition-all shadow-sm flex-1 sm:flex-none min-w-[140px]">
+          <Download size={16}/> Export
+        </button>
       </div>
 
       {/* STAT CARDS */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <StatCard title="Total Students" count={stats.total} icon={Users}
           palette={{ bg:"bg-blue-50", icon:"bg-blue-100 text-blue-600", text:"text-blue-700" }}
-          active={!filters.verificationStatus && !filters.placementReady} onClick={resetFilters} />
+          active={!filters.verificationStatus && !filters.placementReady && !filters.hasResume} onClick={resetFilters} />
         <StatCard title="Verified" count={stats.verified} icon={ShieldCheck}
           palette={{ bg:"bg-emerald-50", icon:"bg-emerald-100 text-emerald-600", text:"text-emerald-700" }}
-          active={filters.verificationStatus==="VERIFIED"} onClick={() => setFilters(p=>({...p, verificationStatus:"VERIFIED"}))} />
+          active={filters.verificationStatus==="VERIFIED"} onClick={() => setFilters({ department:"", semester:"", verificationStatus:"VERIFIED", placementReady:"", hasResume:"" })} />
         <StatCard title="Resumes Uploaded" count={stats.resumeUploaded} icon={FileText}
           palette={{ bg:"bg-purple-50", icon:"bg-purple-100 text-purple-600", text:"text-purple-700" }}
-          active={false} onClick={null} />
+          active={filters.hasResume==="true"} onClick={() => setFilters({ department:"", semester:"", verificationStatus:"", placementReady:"", hasResume:"true" })} />
         <StatCard title="Placement Ready" count={stats.placementReady} icon={Target}
           palette={{ bg:"bg-orange-50", icon:"bg-orange-100 text-orange-500", text:"text-orange-600" }}
-          active={filters.placementReady==="READY"} onClick={() => setFilters(p=>({...p, placementReady:"READY"}))} />
+          active={filters.placementReady==="READY"} onClick={() => setFilters({ department:"", semester:"", verificationStatus:"", placementReady:"READY", hasResume:"" })} />
       </div>
 
-      {/* FILTER BAR — full-width search on its own row, filters fill full width below */}
-      <div className="mb-4">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
-          {/* Full-width search bar */}
-          <div className="relative w-full">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-            <input
-              type="text"
-              placeholder="Search by Student Name or Roll Number"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full h-12 pl-12 pr-10 bg-white border border-[#E5E7EB] rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#F47C20] focus:ring-2 focus:ring-[#F47C20]/20 transition-all"
-            />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                <X size={15}/>
-              </button>
-            )}
-          </div>
-
-          {/* Filters row — each filter stretches equally to fill the full width */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-            <select value={filters.department} onChange={e => setFilters(p=>({...p, department:e.target.value}))}
-              className="h-10 px-3 bg-slate-50 border border-[#E5E7EB] rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:border-[#F47C20] outline-none cursor-pointer w-full transition-all">
-              <option value="">All Departments</option>
-              {departments.map(d => <option key={d.code} value={d.code}>{d.name} ({d.code})</option>)}
-            </select>
-            <select value={filters.semester} onChange={e => setFilters(p=>({...p, semester:e.target.value}))}
-              className="h-10 px-3 bg-slate-50 border border-[#E5E7EB] rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:border-[#F47C20] outline-none cursor-pointer w-full transition-all">
-              <option value="">All Semesters</option>
-              {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
-            </select>
-            <select value={filters.verificationStatus} onChange={e => setFilters(p=>({...p, verificationStatus:e.target.value}))}
-              className="h-10 px-3 bg-slate-50 border border-[#E5E7EB] rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:border-[#F47C20] outline-none cursor-pointer w-full transition-all">
-              <option value="">All Status</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="PENDING">Pending</option>
-            </select>
-            <select value={filters.placementReady} onChange={e => setFilters(p=>({...p, placementReady:e.target.value}))}
-              className="h-10 px-3 bg-slate-50 border border-[#E5E7EB] rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:border-[#F47C20] outline-none cursor-pointer w-full transition-all">
-              <option value="">Placement Status</option>
-              <option value="READY">Ready</option>
-              <option value="NEEDS_ATTENTION">Needs Attention</option>
-            </select>
-            <button onClick={resetFilters}
-              className="h-10 px-4 flex items-center justify-center gap-1.5 text-sm text-slate-500 hover:text-[#F47C20] hover:bg-[#FFF4EB] font-semibold rounded-xl border border-[#E5E7EB] transition-all whitespace-nowrap w-full">
-              <RefreshCw size={13}/>Clear Filters
-            </button>
-          </div>
-
-          {/* Active filter pills */}
-          {hasFilters && (
-            <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
-              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 mr-1"><Filter size={10}/>Active:</span>
-              {searchTerm && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFF4EB] text-[#F47C20] text-xs font-semibold rounded-full border border-[#F47C20]/30 cursor-pointer" onClick={()=>setSearchTerm("")}>"{searchTerm}" <X size={10}/></span>}
-              {filters.department && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFF4EB] text-[#F47C20] text-xs font-semibold rounded-full border border-[#F47C20]/30 cursor-pointer" onClick={()=>setFilters(p=>({...p,department:""}))}>Dept: {filters.department} <X size={10}/></span>}
-              {filters.semester && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFF4EB] text-[#F47C20] text-xs font-semibold rounded-full border border-[#F47C20]/30 cursor-pointer" onClick={()=>setFilters(p=>({...p,semester:""}))}>Sem {filters.semester} <X size={10}/></span>}
-              {filters.verificationStatus && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFF4EB] text-[#F47C20] text-xs font-semibold rounded-full border border-[#F47C20]/30 cursor-pointer" onClick={()=>setFilters(p=>({...p,verificationStatus:""}))}>Status: {filters.verificationStatus} <X size={10}/></span>}
-              {filters.placementReady && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFF4EB] text-[#F47C20] text-xs font-semibold rounded-full border border-[#F47C20]/30 cursor-pointer" onClick={()=>setFilters(p=>({...p,placementReady:""}))}>Placement: {filters.placementReady} <X size={10}/></span>}
-              {filters.hasResume && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFF4EB] text-[#F47C20] text-xs font-semibold rounded-full border border-[#F47C20]/30 cursor-pointer" onClick={()=>setFilters(p=>({...p,hasResume:""}))}>Has Resume <X size={10}/></span>}
-            </div>
+      {/* FILTER BAR */}
+      <div className="mb-4 bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-col xl:flex-row gap-3">
+        <div className="relative flex-1 md:w-1/2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+          <input
+            type="text"
+            placeholder="Search by Student Name or Roll Number"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full h-9 pl-9 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-2 focus:ring-[#F47C20]/20 transition-all"
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"><X size={14}/></button>
           )}
+        </div>
+        
+        <div className="flex items-center gap-2 flex-1 overflow-x-auto pb-1 md:pb-0">
+          <select value={filters.department} onChange={e => setFilters(p=>({...p, department:e.target.value}))} className="h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-[#F47C20] cursor-pointer shrink-0 min-w-24">
+            <option value="">Department</option>
+            {departments.map(d => <option key={d.code} value={d.code}>{d.code}</option>)}
+          </select>
+          <select value={filters.semester} onChange={e => setFilters(p=>({...p, semester:e.target.value}))} className="h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-[#F47C20] cursor-pointer shrink-0 min-w-16">
+            <option value="">Sem</option>
+            {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={filters.verificationStatus} onChange={e => setFilters(p=>({...p, verificationStatus:e.target.value}))} className="h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-[#F47C20] cursor-pointer shrink-0 min-w-20">
+            <option value="">Status</option>
+            <option value="VERIFIED">Verified</option>
+            <option value="PENDING">Pending</option>
+          </select>
+          <select value={filters.placementReady} onChange={e => setFilters(p=>({...p, placementReady:e.target.value}))} className="h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-[#F47C20] cursor-pointer shrink-0 min-w-24">
+            <option value="">Placement</option>
+            <option value="READY">Ready</option>
+            <option value="NEEDS_ATTENTION">Needs Attn</option>
+          </select>
+          <button onClick={resetFilters} className="h-9 px-3 flex items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-[#F47C20] hover:bg-[#FFF4EB] font-semibold rounded-lg border border-slate-200 transition-all shrink-0">
+            <RefreshCw size={12}/> Clear
+          </button>
         </div>
       </div>
 
@@ -461,57 +503,52 @@ export default function StudentManagement() {
             <table className="w-full text-left border-collapse">
               <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-5 py-3.5 w-10">
-                    <input type="checkbox" onChange={handleSelectAll} checked={paginatedStudents.length > 0 && selectedStudentIds.size >= paginatedStudents.length} className="w-4 h-4 text-[#F47C20] rounded focus:ring-[#F47C20]" />
+                  <th className="px-4 py-3 w-10">
+                    <input type="checkbox" onChange={handleSelectAll} checked={paginatedStudents.length > 0 && selectedStudentIds.size >= paginatedStudents.length} className="w-3.5 h-3.5 text-[#F47C20] rounded focus:ring-[#F47C20]" />
                   </th>
-                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Student</th>
-                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Roll No</th>
-                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Dept / Sem</th>
-                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Added On</th>
-                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Status</th>
-                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Resume</th>
-                  <th className="px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Profile</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Roll No</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Dept</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Sem</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">CGPA</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Resume</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Status</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paginatedStudents.map(s => (
                   <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <input type="checkbox" checked={selectedStudentIds.has(s.id)} onChange={() => handleSelectStudent(s.id)} className="w-4 h-4 text-[#F47C20] rounded focus:ring-[#F47C20]" />
+                    <td className="px-4 py-2.5">
+                      <input type="checkbox" checked={selectedStudentIds.has(s.id)} onChange={() => handleSelectStudent(s.id)} className="w-3.5 h-3.5 text-[#F47C20] rounded focus:ring-[#F47C20]" />
                     </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={s.user.name} src={s.profileImageUrl}/>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={s.user.name} src={s.profileImageUrl} size="sm" />
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-800 text-sm truncate">{s.user.name}</p>
-                          <p className="text-xs text-slate-400 truncate hidden sm:block">{s.user.email}</p>
+                          <p className="font-semibold text-slate-800 text-xs truncate">{s.user.name}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{s.user.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 hidden sm:table-cell">
-                      <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">{s.rollNumber}</span>
+                    <td className="px-4 py-2.5 hidden sm:table-cell">
+                      <span className="font-mono text-[11px] font-bold text-slate-600 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">{s.rollNumber}</span>
                     </td>
-                    <td className="px-5 py-3.5 hidden md:table-cell">
-                      <p className="text-sm font-semibold text-slate-700">{s.department}</p>
-                      <p className="text-xs text-slate-400">Semester {s.semester}</p>
+                    <td className="px-4 py-2.5 hidden md:table-cell text-xs font-semibold text-slate-700">{s.department}</td>
+                    <td className="px-4 py-2.5 hidden md:table-cell text-xs font-semibold text-slate-700">{s.semester}</td>
+                    <td className="px-4 py-2.5 hidden md:table-cell text-xs font-semibold text-slate-700">{s.cgpa || '-'}</td>
+                    <td className="px-4 py-2.5 hidden lg:table-cell">
+                      <Badge variant={s.hasResume ? "resume" : "default"}>{s.hasResume ? "Uploaded" : "Missing"}</Badge>
                     </td>
-                    <td className="px-5 py-3.5 hidden md:table-cell">
-                      <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
-                        {s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : '-'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 hidden md:table-cell">
+                    <td className="px-4 py-2.5 hidden lg:table-cell">
                       <Badge variant={s.verificationStatus === "VERIFIED" ? "verified" : "pending"}>
                         {s.verificationStatus === "VERIFIED" ? <CheckCircle size={10}/> : <AlertCircle size={10}/>}
                         {s.verificationStatus === "VERIFIED" ? "VERIFIED" : "PENDING"}
                       </Badge>
                     </td>
-                    <td className="px-5 py-3.5 hidden lg:table-cell">
-                      <Badge variant={s.hasResume ? "resume" : "default"}>{s.hasResume ? "Uploaded" : "Missing"}</Badge>
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
+                    <td className="px-4 py-2.5 text-right">
                       <button onClick={() => setSelectedStudent(s)}
-                        className="px-3.5 py-2 bg-white border border-[#F47C20] text-[#F47C20] text-xs font-bold rounded-xl hover:bg-[#FFF4EB] active:scale-95 transition-all shadow-sm focus:outline-none whitespace-nowrap">
+                        className="px-3 py-1.5 bg-white border border-[#F47C20] text-[#F47C20] text-[11px] font-bold rounded-lg hover:bg-[#FFF4EB] active:scale-95 transition-all shadow-sm focus:outline-none whitespace-nowrap">
                         View
                       </button>
                     </td>
@@ -547,249 +584,205 @@ export default function StudentManagement() {
         </div>
       )}
 
-      {/* STUDENT DETAILS DRAWER */}
+      {/* STUDENT DETAILS MODAL (REDESIGNED 2-COLUMN) */}
       {selectedStudent && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSelectedStudent(null)}/>
-          <div className="relative w-full md:w-[600px] lg:w-[800px] xl:w-[900px] h-full bg-[#F8FAFC] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedStudent(null)}/>
+          <div className="relative w-full max-w-7xl max-h-[90vh] bg-[#F8FAFC] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             
-            {/* Header / Top Bar */}
-            <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 flex-shrink-0 z-10">
+            {/* Modal Header */}
+            <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
               <h3 className="font-extrabold text-slate-800 text-lg">Candidate Profile</h3>
               <button onClick={() => setSelectedStudent(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"><X size={20}/></button>
             </div>
-            
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto">
-              
-              {/* Profile Header Hero */}
-              <div className="bg-white px-6 py-8 border-b border-slate-200">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-                  {/* Avatar */}
-                  <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden shadow-lg border-4 border-white flex-shrink-0 bg-slate-100 flex items-center justify-center">
-                    {selectedStudent.profileImageUrl ? (
-                      <img src={selectedStudent.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-4xl md:text-5xl font-extrabold text-slate-300">
-                        {selectedStudent.user.name?.charAt(0)?.toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Info */}
-                  <div className="flex-1 text-center md:text-left min-w-0">
-                    <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 truncate tracking-tight">{selectedStudent.user.name}</h2>
-                    <p className="text-[#F47C20] font-bold text-base md:text-lg mt-1">{selectedStudent.rollNumber}</p>
-                    
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-3">
-                      <span className="text-sm font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">{selectedStudent.department}</span>
-                      <span className="text-sm font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">Semester {selectedStudent.semester}</span>
-                      
-                      {selectedStudent.verificationStatus === "VERIFIED" ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-emerald-500 text-white shadow-sm">
-                          <CheckCircle size={12}/> VERIFIED
-                        </span>
+
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+              <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+                
+                {/* LEFT COLUMN (Student Identity) */}
+                <div className="lg:col-span-4 flex flex-col gap-6 lg:sticky lg:top-0">
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col items-center text-center">
+                    <div className="w-24 h-24 rounded-full overflow-hidden shadow-md border-2 border-white flex-shrink-0 bg-slate-100 flex items-center justify-center mb-4">
+                      {selectedStudent.profileImageUrl ? (
+                        <img src={selectedStudent.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-[#F47C20] text-white shadow-sm">
-                          <AlertCircle size={12}/> PENDING
+                        <span className="text-3xl font-extrabold text-slate-300">
+                          {selectedStudent.user.name?.charAt(0)?.toUpperCase()}
                         </span>
                       )}
                     </div>
+                    <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{selectedStudent.user.name}</h2>
+                    <p className="text-[#F47C20] font-bold text-base mb-4">{selectedStudent.rollNumber}</p>
+                    
+                    <div className="w-full h-px bg-slate-100 my-4"></div>
+                    
+                    <div className="flex flex-col gap-3 w-full">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 font-semibold">Department</span>
+                        <span className="font-bold text-slate-800">{selectedStudent.department || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 font-semibold">Semester</span>
+                        <span className="font-bold text-slate-800">{selectedStudent.semester || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 font-semibold">CGPA</span>
+                        <span className="font-bold text-slate-800">{selectedStudent.cgpa || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm mt-1">
+                        <span className="text-slate-500 font-semibold">Status</span>
+                        {selectedStudent.verificationStatus === "VERIFIED" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200"><CheckCircle size={10}/> VERIFIED</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#FFF4EB] text-[#F47C20] border border-[#F47C20]/30"><AlertCircle size={10}/> PENDING</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 font-semibold">Backlogs</span>
+                        <span className="font-bold text-slate-800">{selectedStudent.backlogs || 0}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Body Content */}
-              <div className="p-4 md:p-6 space-y-6">
-                
-                {/* Profile Summary KPIs */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                    { label: "CGPA", value: selectedStudent.cgpa || "N/A", icon: Target },
-                    { label: "Semester", value: selectedStudent.semester, icon: FileText },
-                    { label: "Backlogs", value: selectedStudent.backlogs || 0, icon: AlertCircle },
-                    { label: "Applications", value: selectedStudent.applicationStats?.applied || 0, icon: FileText }
-                  ].map((stat, i) => (
-                    <div key={i} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center hover:border-slate-300 transition-colors">
-                      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mb-2">
-                        <stat.icon size={16} className="text-slate-400" />
-                      </div>
-                      <p className="text-2xl font-extrabold text-slate-800">{stat.value}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">{stat.label}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Info Cards Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  
-                  {/* Personal Info */}
-                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
-                      <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><Users size={16} className="text-[#F47C20]"/> Personal Information</h4>
-                    </div>
-                    <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-y-5 gap-x-6">
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Full Name</p>
-                        <p className="text-sm font-semibold text-slate-800">{selectedStudent.user.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Roll Number</p>
-                        <p className="text-sm font-semibold text-slate-800">{selectedStudent.rollNumber}</p>
-                      </div>
+                  {/* Personal Information */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <h4 className="font-bold text-[#F47C20] text-sm mb-4 flex items-center gap-2 uppercase tracking-wide"><Users size={16} /> Personal Info</h4>
+                    <div className="space-y-4">
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Address</p>
                         <p className="text-sm font-semibold text-slate-800 break-all">{selectedStudent.user.email}</p>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mobile Number</p>
-                        <p className="text-sm font-semibold text-slate-800">{selectedStudent.mobileNumber || "N/A"}</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mobile</p>
+                          <p className="text-sm font-semibold text-slate-800">{selectedStudent.mobileNumber || "N/A"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Account Status</p>
+                          <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-bold ${selectedStudent.user.accountStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>{selectedStudent.user.accountStatus}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Academic Info */}
-                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
-                      <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><Target size={16} className="text-[#F47C20]"/> Academic Overview</h4>
-                    </div>
-                    <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-y-5 gap-x-6">
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Department</p>
-                        <p className="text-sm font-semibold text-slate-800">{selectedStudent.department}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Semester</p>
-                        <p className="text-sm font-semibold text-slate-800">Semester {selectedStudent.semester}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Placement Status</p>
-                        {selectedStudent.isPlacementReady ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#FFF4EB] text-[#F47C20]">Ready</span>
-                        ) : (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-600">Needs Attention</span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Account Status</p>
-                        <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-bold ${selectedStudent.user.accountStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                          {selectedStudent.user.accountStatus}
-                        </span>
-                      </div>
+                  {/* Administrative Actions */}
+                  <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6 mt-auto border-t-4 border-t-[#F47C20]">
+                    <h4 className="font-bold text-[#F47C20] text-sm mb-4 flex items-center gap-2 uppercase tracking-wide"><ShieldCheck size={16}/> Administrative Actions</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {selectedStudent.verificationStatus !== "VERIFIED" && (
+                        <button onClick={() => setShowApproveModal(true)} className="w-full py-2.5 bg-white border border-[#F47C20] text-[#F47C20] text-sm font-bold rounded-xl hover:bg-[#FFF4EB] shadow-sm flex justify-center items-center gap-2 transition-all focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">
+                          <CheckCircle size={16}/> Approve Student
+                        </button>
+                      )}
+                      <button onClick={() => setShowResetModal(true)} className="w-full py-2.5 bg-white border border-[#F47C20] text-[#F47C20] text-sm font-bold rounded-xl hover:bg-[#FFF4EB] shadow-sm flex justify-center items-center gap-2 transition-all focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">
+                        <KeyRound size={16}/> Reset Password
+                      </button>
+                      <button onClick={() => setShowRemoveModal(true)} className="w-full py-2.5 bg-white border border-[#F47C20] text-[#F47C20] text-sm font-bold rounded-xl hover:bg-[#FFF4EB] shadow-sm flex justify-center items-center gap-2 transition-all focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">
+                        <XCircle size={16}/> Remove Student
+                      </button>
                     </div>
                   </div>
+
                 </div>
 
-                {/* Skills Section */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
-                    <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><KeyRound size={16} className="text-[#F47C20]"/> Technical Skills</h4>
-                  </div>
-                  <div className="p-5">
+                {/* RIGHT COLUMN (Content & Actions) */}
+                <div className="lg:col-span-8 flex flex-col gap-6">
+                  
+                  {/* Technical Skills */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <h4 className="font-bold text-[#F47C20] text-sm mb-4 flex items-center gap-2 uppercase tracking-wide"><KeyRound size={16} /> Technical Skills</h4>
                     {selectedStudent.skills?.length > 0 ? (
-                      <div className="flex flex-wrap gap-2.5">
+                      <div className="flex flex-wrap gap-2">
                         {selectedStudent.skills.map((skill, idx) => (
-                          <span key={idx} className="px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-default shadow-sm">
-                            {skill}
-                          </span>
+                          <span key={idx} className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg shadow-sm">{skill}</span>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-400 italic">No skills listed yet.</p>
+                      <p className="text-sm text-slate-400 italic">No skills listed.</p>
                     )}
                   </div>
-                </div>
 
-                {/* Resume Section */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
-                    <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><FileText size={16} className="text-[#F47C20]"/> Resume</h4>
+                  {/* Resume Section */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <h4 className="font-bold text-[#F47C20] text-sm mb-4 flex items-center gap-2 uppercase tracking-wide"><FileText size={16}/> Resume</h4>
+                    {selectedStudent.hasResume ? (
+                      <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl gap-4">
+                        <div className="flex items-center gap-4 w-full sm:w-auto">
+                          <div className="w-12 h-12 bg-[#FFF4EB] rounded-xl flex items-center justify-center text-[#F47C20] flex-shrink-0">
+                            <FileText size={24} />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-slate-800 text-sm truncate">Resume Available</h3>
+                            <p className="text-xs text-slate-500">Ready for review</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <button onClick={() => handleAdminViewResume(selectedStudent)} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-[#F47C20] text-[#F47C20] text-xs font-bold rounded-lg hover:bg-[#FFF4EB] transition-all shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">View Resume</button>
+                          <button onClick={() => handleAdminDownloadResume(selectedStudent.id, selectedStudent.rollNumber)} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-[#F47C20] text-[#F47C20] text-xs font-bold rounded-lg hover:bg-[#FFF4EB] transition-all shadow-sm flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2"><Download size={14}/> Download Resume</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                        <p className="text-sm font-semibold text-slate-500">No Resume Uploaded</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${selectedStudent.hasResume ? 'bg-[#FFF4EB] text-[#F47C20]' : 'bg-slate-100 text-slate-400'}`}>
-                        <FileText size={24} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">{selectedStudent.hasResume ? "Resume Uploaded" : "No Resume"}</p>
-                        {selectedStudent.hasResume && <p className="text-xs text-slate-500 mt-0.5">Available for download</p>}
-                      </div>
+
+                  {/* Placement Activity */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-bold text-[#F47C20] text-sm flex items-center gap-2 uppercase tracking-wide"><Target size={16} /> Placement Activity</h4>
+                      {selectedStudent.isPlacementReady ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFF4EB] text-[#F47C20] border border-[#F47C20]/30 shadow-sm">Placement Ready</span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 shadow-sm">Needs Attention</span>
+                      )}
                     </div>
-                    {selectedStudent.hasResume && (
-                      <div className="flex gap-2.5 w-full sm:w-auto">
-                        <button className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] text-xs font-bold rounded-xl hover:bg-[#FFF4EB] transition-colors whitespace-nowrap shadow-sm">
-                          View
-                        </button>
-                        <button className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] text-xs font-bold rounded-xl hover:bg-[#FFF4EB] transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm">
-                          <Download size={14}/> Download
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Placement Activity / Applications */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
-                    <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><Target size={16} className="text-[#F47C20]"/> Placement Activity</h4>
-                  </div>
-                  <div className="p-5 grid grid-cols-2 lg:grid-cols-4 gap-4">
-                     {[
-                        {label:"Applied",     value:selectedStudent.applicationStats?.applied||0,     cls:"text-slate-800", bg:"bg-slate-50 border-slate-200"},
-                        {label:"Shortlisted", value:selectedStudent.applicationStats?.shortlisted||0,  cls:"text-blue-700",  bg:"bg-blue-50 border-blue-200"},
-                        {label:"Selected",    value:selectedStudent.applicationStats?.selected||0,     cls:"text-emerald-700",bg:"bg-emerald-50 border-emerald-200"},
-                        {label:"Rejected",    value:selectedStudent.applicationStats?.rejected||0,     cls:"text-red-600",   bg:"bg-red-50 border-red-200"},
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        {label:"Applied", value:selectedStudent.applicationStats?.applied||0, color:"text-slate-700", bg:"bg-slate-50 border-slate-200"},
+                        {label:"Shortlisted", value:selectedStudent.applicationStats?.shortlisted||0, color:"text-blue-700", bg:"bg-blue-50 border-blue-200"},
+                        {label:"Selected", value:selectedStudent.applicationStats?.selected||0, color:"text-emerald-700", bg:"bg-emerald-50 border-emerald-200"},
+                        {label:"Rejected", value:selectedStudent.applicationStats?.rejected||0, color:"text-red-700", bg:"bg-red-50 border-red-200"},
                       ].map((stat, i) => (
-                        <div key={i} className={`${stat.bg} border rounded-xl p-5 flex flex-col items-center justify-center text-center`}>
-                          <p className={`text-3xl font-extrabold ${stat.cls}`}>{stat.value}</p>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1.5">{stat.label}</p>
+                        <div key={i} className={`${stat.bg} border rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-sm`}>
+                          <p className={`text-2xl font-extrabold ${stat.color} mb-1`}>{stat.value}</p>
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
                         </div>
                       ))}
+                    </div>
                   </div>
+
+                  {/* Projects Section */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <h4 className="font-bold text-[#F47C20] text-sm mb-4 flex items-center gap-2 uppercase tracking-wide"><CheckCircle2 size={16}/> Projects</h4>
+                    {selectedStudent.projects?.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedStudent.projects.map((p, i) => (
+                          <div key={i} className="p-4 bg-slate-50 border border-slate-200 rounded-xl shadow-sm flex flex-col gap-2">
+                            <h5 className="font-bold text-slate-800 text-sm">{p.title}</h5>
+                            {p.description && <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed flex-1">{p.description}</p>}
+                            {p.tech && p.tech.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {p.tech.map((t, ti) => <span key={ti} className="px-1.5 py-0.5 bg-white border border-slate-200 text-[9px] font-semibold text-slate-600 rounded">{t}</span>)}
+                              </div>
+                            )}
+                            <div className="flex gap-2 pt-2 border-t border-slate-100 mt-1">
+                              {isValidUrl(p.sourceUrl) && <a href={p.sourceUrl} target="_blank" rel="noreferrer" className="flex-1 text-center px-2.5 py-1.5 bg-white border border-[#F47C20] text-[#F47C20] hover:bg-[#FFF4EB] text-[10px] font-bold rounded shadow-sm transition-colors">Code</a>}
+                              {isValidUrl(p.demoUrl) && <a href={p.demoUrl} target="_blank" rel="noreferrer" className="flex-1 text-center px-2.5 py-1.5 bg-white border border-[#F47C20] text-[#F47C20] hover:bg-[#FFF4EB] text-[10px] font-bold rounded shadow-sm transition-colors">Demo</a>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                        <p className="text-sm font-semibold text-slate-500">No projects added yet.</p>
+                      </div>
+                    )}
+                  </div>
+
                 </div>
-
-                {/* Projects Section */}
-                {selectedStudent.projects?.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
-                      <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2"><Target size={16} className="text-[#F47C20]"/> Projects</h4>
-                    </div>
-                    <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedStudent.projects.map((p,i) => (
-                        <div key={i} className="p-5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors h-full flex flex-col">
-                          <p className="font-bold text-slate-800 text-sm">{p.title}</p>
-                          {p.description && <p className="text-xs text-slate-600 mt-2 line-clamp-3 leading-relaxed flex-1">{p.description}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
-            
-            {/* Administrative Actions Footer */}
-            <div className="flex-shrink-0 border-t border-slate-200 bg-white p-5">
-              <h4 className="font-bold text-slate-800 text-sm mb-3">Administrative Actions</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <button 
-                  onClick={() => selectedStudent.verificationStatus !== "VERIFIED" && setShowApproveModal(true)}
-                  disabled={selectedStudent.verificationStatus === "VERIFIED"}
-                  className={`w-full py-2.5 font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm ${
-                    selectedStudent.verificationStatus === "VERIFIED" 
-                      ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                      : "bg-white border border-[#F47C20] text-[#F47C20] hover:bg-[#FFF4EB]"
-                  }`}>
-                  <CheckCircle size={16}/> {selectedStudent.verificationStatus === "VERIFIED" ? "Approved" : "Approve Student"}
-                </button>
-                <button onClick={() => setShowResetModal(true)}
-                  className="w-full py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-bold text-sm rounded-xl hover:bg-[#FFF4EB] transition-all flex items-center justify-center gap-1.5 shadow-sm">
-                  <KeyRound size={16}/> Reset Password
-                </button>
-                <button onClick={() => setShowRemoveModal(true)}
-                  className="w-full py-2.5 bg-white border border-red-500 text-red-500 font-bold text-sm rounded-xl hover:bg-red-50 transition-all flex items-center justify-center gap-1.5 shadow-sm">
-                  <XCircle size={16}/> Remove Student
-                </button>
               </div>
             </div>
           </div>
@@ -806,8 +799,8 @@ export default function StudentManagement() {
             <h3 className="text-xl font-extrabold text-slate-800 mb-2">Approve this student?</h3>
             <p className="text-sm text-slate-500 mb-6">This action will mark the student as verified by the Placement Cell.</p>
             <div className="flex gap-3">
-              <button onClick={() => setShowApproveModal(false)} className="flex-1 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl text-sm transition-colors">Cancel</button>
-              <button onClick={handleApprove} className="flex-1 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl hover:bg-[#FFF4EB] transition-colors text-sm shadow-sm">Approve</button>
+              <button onClick={() => setShowApproveModal(false)} className="flex-1 py-2.5 text-[#F47C20] font-bold hover:bg-[#FFF4EB] rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">Cancel</button>
+              <button onClick={handleApprove} className="flex-1 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl hover:bg-[#FFF4EB] transition-colors text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">Approve</button>
             </div>
           </div>
         </div>
@@ -823,8 +816,8 @@ export default function StudentManagement() {
             <h3 className="text-xl font-extrabold text-slate-800 mb-2">Reset password for this student?</h3>
             <p className="text-sm text-slate-500 mb-6">A temporary password will be generated for {selectedStudent?.user?.name}.</p>
             <div className="flex gap-3">
-              <button onClick={() => setShowResetModal(false)} className="flex-1 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl text-sm transition-colors">Cancel</button>
-              <button onClick={handleResetPassword} className="flex-1 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl hover:bg-[#FFF4EB] transition-colors text-sm shadow-sm">Reset Password</button>
+              <button onClick={() => setShowResetModal(false)} className="flex-1 py-2.5 text-[#F47C20] font-bold hover:bg-[#FFF4EB] rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">Cancel</button>
+              <button onClick={handleResetPassword} className="flex-1 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl hover:bg-[#FFF4EB] transition-colors text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">Reset Password</button>
             </div>
           </div>
         </div>
@@ -849,11 +842,11 @@ export default function StudentManagement() {
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center font-bold text-slate-800 mb-6 outline-none focus:border-red-300 focus:bg-white transition-all"
             />
             <div className="flex gap-3">
-              <button onClick={() => {setShowRemoveModal(false); setRemoveConfirmText("");}} className="flex-1 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl text-sm transition-colors">Cancel</button>
+              <button onClick={() => {setShowRemoveModal(false); setRemoveConfirmText("");}} className="flex-1 py-2.5 text-[#F47C20] font-bold hover:bg-[#FFF4EB] rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">Cancel</button>
               <button 
                 onClick={handleDeleteStudent} 
                 disabled={removeConfirmText !== "DELETE"}
-                className="flex-1 py-2.5 bg-white border border-red-500 text-red-500 font-bold rounded-xl hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm shadow-sm">
+                className="flex-1 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl hover:bg-[#FFF4EB] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">
                 Remove Student
               </button>
             </div>
@@ -909,8 +902,8 @@ export default function StudentManagement() {
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-7 pt-5 border-t border-slate-100">
-                <button type="button" onClick={()=>setShowAddModal(false)} className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl text-sm transition-colors">Cancel</button>
-                <button type="submit" className="px-6 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl hover:bg-[#FFF4EB] transition-colors shadow-sm text-sm">Create Student</button>
+                <button type="button" onClick={()=>setShowAddModal(false)} className="px-5 py-2.5 text-[#F47C20] font-bold hover:bg-[#FFF4EB] rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">Cancel</button>
+                <button type="submit" className="px-6 py-2.5 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl hover:bg-[#FFF4EB] transition-colors shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">Create Student</button>
               </div>
             </form>
           </div>
@@ -1025,11 +1018,11 @@ export default function StudentManagement() {
                   )}
 
                   <div className="flex gap-3">
-                    <button onClick={closeImportModal} disabled={importing} className="flex-1 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl text-sm transition-colors disabled:opacity-50">Cancel</button>
+                    <button onClick={closeImportModal} disabled={importing} className="flex-1 py-3 text-[#F47C20] font-bold hover:bg-[#FFF4EB] rounded-xl text-sm transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">Cancel</button>
                     <button 
                       onClick={handleImport}
                       disabled={!selectedFile || importing} 
-                      className="flex-1 py-3 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl text-sm hover:bg-[#FFF4EB] transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="flex-1 py-3 bg-white border border-[#F47C20] text-[#F47C20] font-bold rounded-xl text-sm hover:bg-[#FFF4EB] transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2"
                     >
                       {importing ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : "Upload File"}
                     </button>
@@ -1060,7 +1053,7 @@ export default function StudentManagement() {
                     </div>
                   </div>
 
-                  <button onClick={closeImportModal} className="w-full py-3 bg-white border border-[#F47C20] text-[#F47C20] font-bold text-sm rounded-xl hover:bg-[#FFF4EB] transition-colors shadow-sm">
+                  <button onClick={closeImportModal} className="w-full py-3 bg-white border border-[#F47C20] text-[#F47C20] font-bold text-sm rounded-xl hover:bg-[#FFF4EB] transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2">
                     Done
                   </button>
                 </div>
@@ -1068,6 +1061,16 @@ export default function StudentManagement() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* FOOTER PADDING FIX FOR OVERFLOWING CONTENT IN MODAL */}
+      {selectedStudent && (
+        <style dangerouslySetInnerHTML={{__html: `
+          .flex-1.overflow-y-auto {
+            /* padding-bottom to ensure admin actions are scrollable if screen is very short */
+            padding-bottom: 2rem !important;
+          }
+        `}} />
       )}
 
       <ExportDataModal 
@@ -1079,6 +1082,15 @@ export default function StudentManagement() {
         totalCount={students.length}
         selectedCount={selectedStudentIds.size}
         currentPageCount={paginatedStudents.length}
+      />
+      {/* DOCUMENT VIEWER MODAL */}
+      <DocumentViewerModal
+        isOpen={viewerOpen}
+        onClose={closeDocumentViewer}
+        documentUrl={viewerUrl}
+        fileName={viewerMetadata?.fileName}
+        studentName={viewerMetadata?.studentName}
+        rollNumber={viewerMetadata?.rollNumber}
       />
     </DashboardLayout>
   );

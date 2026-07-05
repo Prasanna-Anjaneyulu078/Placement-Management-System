@@ -1,418 +1,549 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { 
-  User, Mail, Phone, MapPin, Linkedin, Github, 
-  Edit2, Download, X, Briefcase, Building, Plus, Trash2
+  User, Mail, Phone, MapPin, Linkedin, Edit2, 
+  Briefcase, GraduationCap, ShieldCheck, CheckCircle, Save, X, BookOpen, Star, Camera, ExternalLink, Lock, Shield, FileText, Download, Eye, EyeOff
 } from 'lucide-react';
-import { Modal, Input, Button } from '../../components/common';
-import './AlumniProfile.css';
+import { Modal, LoadingSpinner, DocumentViewerModal } from '../../components/common';
+import StatusBadge from '../../components/common/StatusBadge';
+import { generateAvatarSVG } from '../../utils/avatarUtils';
+import api from '../../utils/axiosConfig';
+import { toast } from 'react-toastify';
+import useDepartments from '../../hooks/useDepartments';
+import { useData } from '../../context/DataContext';
 
 export default function AlumniProfile() {
-  const [showAboutModal, setShowAboutModal] = useState(false);
-  const [showBasicModal, setShowBasicModal] = useState(false);
-  const [showWorkModal, setShowWorkModal] = useState(false);
-  const [showEduModal, setShowEduModal] = useState(false);
+  const { departments } = useDepartments();
+  const { profileImage, updateProfileImage } = useData();
+  const [profile, setProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [editingWork, setEditingWork] = useState(null);
-  const [editingEdu, setEditingEdu] = useState(null);
-
-  // Data State
-  const [basicInfo, setBasicInfo] = useState({
-    name: 'Alex Johnson',
-    role: 'Senior Product Designer @ Google',
-    email: 'alex.j@google.com',
-    phone: '+1 555 0123',
-    location: 'Mountain View, CA',
-    linkedin: 'https://linkedin.com/in/alexjohnson',
-    github: 'https://github.com/alexjohnson'
+  // Settings states
+  const [documentUrl, setDocumentUrl] = useState('');
+  const [docBlobUrl, setDocBlobUrl] = useState(null);
+  const [documentMeta, setDocumentMeta] = useState(null);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [docLoading, setDocLoading] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
   });
+  const [showPwd, setShowPwd] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+  const [isChangingPwd, setIsChangingPwd] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  const [aboutMe, setAboutMe] = useState(`Senior Product Designer with over 8 years of experience in creating user-centric digital products. 
-Alumni of the 2016 Computer Science batch. Currently working at Google, focusing on scalable design systems and mobile experiences. 
-Always happy to mentor students and share industry insights.`);
+  // Modals
+  const [showPersonalModal, setShowPersonalModal] = useState(false);
+  const [showProfessionalModal, setShowProfessionalModal] = useState(false);
 
-  const [workExperience, setWorkExperience] = useState([
-    {
-      id: 1,
-      title: 'Senior Product Designer',
-      company: 'Google',
-      year: '2020 - Present • Full-time'
-    },
-    {
-      id: 2,
-      title: 'Product Designer',
-      company: 'Airbnb',
-      year: '2017 - 2020 • 3 years'
+  // Forms
+  const [personalForm, setPersonalForm] = useState({});
+  const [professionalForm, setProfessionalForm] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    fetchProfile();
+    fetchDocumentUrl();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/alumni/profile');
+      const data = res.data;
+      setProfile(data);
+      setPersonalForm({
+        mobileNumber: data.mobileNumber || '',
+        gender: data.gender || '',
+        linkedinUrl: data.linkedinUrl || ''
+      });
+      setProfessionalForm({
+        company: data.company || '',
+        designation: data.designation || '',
+        passingYear: data.passingYear || '',
+        department: data.department || '',
+        degree: data.degree || ''
+      });
+    } catch (err) {
+      toast.error('Failed to load profile');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
-  ]);
-
-  const [education, setEducation] = useState([
-    {
-      id: 1,
-      degree: 'B.Tech in Computer Science',
-      school: 'University of Technology',
-      year: 'Batch of 2016'
-    }
-  ]);
-
-  // Form States
-  const [aboutForm, setAboutForm] = useState('');
-  const [basicForm, setBasicForm] = useState({ ...basicInfo });
-  const [workForm, setWorkForm] = useState({ title: '', company: '', year: '' });
-  const [eduForm, setEduForm] = useState({ degree: '', school: '', year: '' });
-
-  // Handlers
-  const handleUpdateAbout = (e) => {
-    e.preventDefault();
-    setAboutMe(aboutForm);
-    setShowAboutModal(false);
   };
 
-  const handleUpdateBasic = (e) => {
-    e.preventDefault();
-    setBasicInfo(basicForm);
-    setShowBasicModal(false);
+  const fetchDocumentUrl = async () => {
+    try {
+      setDocLoading(true);
+      const res = await api.get('/alumni/documents/my-document');
+      if (res.data && res.data.url) {
+        setDocumentUrl(res.data.url);
+        setDocumentMeta({
+          documentName: res.data.documentName,
+          uploadDate: res.data.uploadDate,
+          documentType: res.data.documentType
+        });
+        
+        try {
+          const blobRes = await api.get(res.data.url, { responseType: 'blob' });
+          const blobUrl = URL.createObjectURL(blobRes.data);
+          setDocBlobUrl(blobUrl);
+        } catch (blobErr) {
+          console.error('Failed to fetch document blob', blobErr);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch document URL', err);
+    } finally {
+      setDocLoading(false);
+    }
   };
 
-  const handleWorkSubmit = (e) => {
+  const handleSave = async (type) => {
+    try {
+      setIsSaving(true);
+      
+      let updatedData = { ...profile };
+      
+      if (type === 'personal') {
+        updatedData = { ...updatedData, ...personalForm };
+      } else if (type === 'professional') {
+        updatedData = { ...updatedData, ...professionalForm };
+      }
+
+      await api.put('/alumni/profile', updatedData);
+      setProfile(updatedData);
+      toast.success('Profile updated successfully');
+      
+      setShowPersonalModal(false);
+      setShowProfessionalModal(false);
+    } catch (err) {
+      toast.error('Failed to update profile');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
     e.preventDefault();
-    if (editingWork) {
-      setWorkExperience(workExperience.map(w => w.id === editingWork.id ? { ...workForm, id: w.id } : w));
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    
+    setIsChangingPwd(true);
+    try {
+      await api.post('/auth/change-password', {
+        email: profile?.user?.email,
+        oldPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+      toast.success('Password changed successfully');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to change password');
+    } finally {
+      setIsChangingPwd(false);
+    }
+  };
+
+  const handleViewDocument = () => {
+    if (docBlobUrl) {
+      setShowDocumentModal(true);
     } else {
-      setWorkExperience([...workExperience, { ...workForm, id: Date.now() }]);
-    }
-    closeWorkModal();
-  };
-
-  const handleEduSubmit = (e) => {
-    e.preventDefault();
-    if (editingEdu) {
-      setEducation(education.map(edu => edu.id === editingEdu.id ? { ...eduForm, id: edu.id } : edu));
-    } else {
-      setEducation([...education, { ...eduForm, id: Date.now() }]);
-    }
-    closeEduModal();
-  };
-
-  const openEditWork = (work) => {
-    setEditingWork(work);
-    setWorkForm({ title: work.title, company: work.company, year: work.year });
-    setShowWorkModal(true);
-  };
-
-  const deleteWork = (id) => {
-    if (window.confirm('Delete this work experience?')) {
-      setWorkExperience(workExperience.filter(w => w.id !== id));
+      toast.error("Document not found");
     }
   };
 
-  const openEditEdu = (edu) => {
-    setEditingEdu(edu);
-    setEduForm({ degree: edu.degree, school: edu.school, year: edu.year });
-    setShowEduModal(true);
-  };
-
-  const deleteEdu = (id) => {
-    if (window.confirm('Delete this education entry?')) {
-      setEducation(education.filter(edu => edu.id !== id));
+  const handleDownloadDocument = () => {
+    if (docBlobUrl) {
+      const link = document.createElement('a');
+      link.href = docBlobUrl;
+      link.download = documentMeta?.documentName || 'Verification_Document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
-  const closeWorkModal = () => {
-    setShowWorkModal(false);
-    setEditingWork(null);
-    setWorkForm({ title: '', company: '', year: '' });
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    setIsUploadingImage(true);
+    try {
+      const res = await api.post('/alumni/profile-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setProfile(prev => ({ ...prev, profileImageUrl: res.data.profileImageUrl }));
+      updateProfileImage(res.data.profileImageUrl);
+      toast.success('Profile picture updated successfully');
+    } catch (err) {
+      console.error('Failed to upload image', err);
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
-  const closeEduModal = () => {
-    setShowEduModal(false);
-    setEditingEdu(null);
-    setEduForm({ degree: '', school: '', year: '' });
-  };
+  if (isLoading) {
+    return (
+      <DashboardLayout role="alumni">
+        <div className="flex justify-center items-center h-full min-h-[60vh]">
+          <LoadingSpinner size="lg" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const actionBtnStyle = "py-2.5 px-4 bg-[#FFF4EB] border border-[#F47C20] text-[#F47C20] rounded-xl text-sm font-bold hover:bg-white hover:text-[#F47C20] focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm cursor-pointer";
+  const smallActionBtnStyle = "px-4 py-2 bg-[#FFF4EB] border border-[#F47C20] text-[#F47C20] rounded-xl text-xs font-bold hover:bg-white hover:text-[#F47C20] focus:outline-none focus:ring-2 focus:ring-[#F47C20] focus:ring-offset-2 transition-all flex justify-center items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer";
 
   return (
     <DashboardLayout role="alumni">
-      <div className="profile-header-bg"></div>
-      
-      <div className="profile-content-wrapper">
-        <div className="profile-sidebar">
-          <div className="profile-sidebar-info">
-            <div className="profile-avatar-container">
-              <div className="profile-avatar-xl alumni-profile-avatar"></div>
-              <button 
-                className="edit-avatar-btn" 
-                onClick={() => {
-                  setBasicForm({ ...basicInfo });
-                  setShowBasicModal(true);
-                }}
-              >
-                <Edit2 size={16} />
-              </button>
-            </div>
+      <div className="w-full max-w-7xl mx-auto space-y-6 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* LEFT COLUMN */}
+          <div className="lg:col-span-4 flex flex-col gap-6">
             
-            <h2 className="sidebar-name">{basicInfo.name}</h2>
-            <p className="sidebar-role">{basicInfo.role}</p>
-            
-            <div className="sidebar-contact">
-              <div className="contact-item">
-                <Mail size={16} />
-                <span>{basicInfo.email}</span>
+            {/* Identity Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+              <div className="h-32 bg-gradient-to-r from-slate-800 to-slate-700 relative">
+                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_2px_2px,white_1px,transparent_0)] bg-[size:16px_16px]"></div>
               </div>
-              <div className="contact-item">
-                <Phone size={16} />
-                <span>{basicInfo.phone}</span>
-              </div>
-              <div className="contact-item">
-                <MapPin size={16} />
-                <span>{basicInfo.location}</span>
-              </div>
-            </div>
-
-            <div className="sidebar-social">
-              <a href={basicInfo.linkedin} target="_blank" rel="noopener noreferrer" className="social-btn"><Linkedin size={20} /></a>
-              <a href={basicInfo.github} target="_blank" rel="noopener noreferrer" className="social-btn"><Github size={20} /></a>
-              <a href="#" className="social-btn"><User size={20} /></a>
-            </div>
-          </div>
-        </div>
-
-        <div className="profile-main">
-          <div className="profile-section">
-            <div className="section-header">
-              <h3 className="section-title">Professional Bio</h3>
-              <button 
-                className="edit-btn" 
-                onClick={() => {
-                  setAboutForm(aboutMe);
-                  setShowAboutModal(true);
-                }}
-              >
-                <Edit2 size={14} />
-                <span>Edit Bio</span>
-              </button>
-            </div>
-            <p className="section-text">
-              {aboutMe}
-            </p>
-          </div>
-
-          <div className="profile-section">
-            <div className="section-header">
-              <h3 className="section-title">Work Experience</h3>
-              <button className="edit-btn" onClick={() => setShowWorkModal(true)}>
-                <Plus size={14} />
-                <span>Add Experience</span>
-              </button>
-            </div>
-            <div className="education-list">
-              {workExperience.map(work => (
-                <div key={work.id} className="education-item">
-                  <div className="edu-icon"><Building size={20} /></div>
-                  <div className="edu-details">
-                    <h4 className="edu-degree">{work.title}</h4>
-                    <p className="edu-school">{work.company}</p>
-                    <p className="edu-year">{work.year}</p>
-                  </div>
-                  <div className="work-item-actions">
-                    <button className="action-icon" onClick={() => openEditWork(work)}><Edit2 size={14} /></button>
-                    <button className="action-icon delete" onClick={() => deleteWork(work.id)}><Trash2 size={14} /></button>
+              <div className="px-6 pb-6 relative text-center">
+                <div className="flex justify-center -mt-16 mb-4 relative z-10">
+                  <div className="relative group">
+                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-md bg-white">
+                      <img 
+                        src={
+                          (profileImage && !profileImage.includes('http') ? `http://localhost:8082/api/public/alumni/profile-image/${profileImage}` : profileImage) || 
+                          (profile?.profileImageUrl ? `http://localhost:8082/api/public/alumni/profile-image/${profile.profileImageUrl}` : null) || 
+                          generateAvatarSVG(profile?.user?.name || 'Alumni', 'F47C20', 'fff')
+                        }
+                        onError={(e) => { e.target.onerror = null; e.target.src = generateAvatarSVG(profile?.user?.name || 'Alumni', 'F47C20', 'fff'); }}
+                        alt="Profile" 
+                        className={`w-full h-full object-cover ${isUploadingImage ? 'opacity-50' : ''}`}
+                      />
+                    </div>
+                    <label className="absolute bottom-1 right-1 w-9 h-9 bg-[#F47C20] rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-[#E06915] hover:scale-110 transition-all border-2 border-white" title="Change Profile Picture">
+                      <Camera size={16} />
+                      <input 
+                        type="file" 
+                        accept="image/jpeg, image/png, image/webp" 
+                        className="hidden" 
+                        onChange={handleImageUpload}
+                      />
+                    </label>
                   </div>
                 </div>
-              ))}
+                
+                <h2 className="text-xl font-extrabold text-slate-800 tracking-tight flex justify-center items-center gap-2">
+                  {profile?.user?.name || 'Alumni'}
+                  {profile?.verificationStatus === 'VERIFIED' && <ShieldCheck size={20} className="text-emerald-500"/>}
+                </h2>
+                <p className="text-sm font-semibold text-[#F47C20] mt-1">{profile?.rollNumber || 'N/A'}</p>
+                <p className="text-sm font-medium text-slate-500 mt-1">{profile?.department || 'Department Not Specified'}</p>
+                <p className="text-sm font-medium text-slate-500 mt-1">{profile?.passingYear ? `Class of ${profile.passingYear}` : 'Passing Year Not Specified'}</p>
+                
+                <div className="mt-5 flex items-center justify-center gap-3">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider ${
+                    profile?.verificationStatus === 'VERIFIED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                    profile?.verificationStatus === 'PENDING' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                    'bg-red-50 text-red-600 border border-red-100'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${
+                      profile?.verificationStatus === 'VERIFIED' ? 'bg-emerald-500' :
+                      profile?.verificationStatus === 'PENDING' ? 'bg-amber-500' : 'bg-red-500'
+                    }`}></div> 
+                    {profile?.verificationStatus || 'UNVERIFIED'}
+                  </span>
+                </div>
+              </div>
             </div>
+
+            {/* Contact Details */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Mail size={14}/> Contact Details</h3>
+                <button onClick={() => setShowPersonalModal(true)} className="px-2 py-1 bg-[#FFF4EB] border border-[#F47C20] text-[#F47C20] rounded-md text-[10px] font-bold uppercase tracking-wider hover:bg-white hover:text-[#F47C20] focus:outline-none focus:ring-2 focus:ring-[#F47C20] transition-all flex items-center gap-1 shadow-sm">
+                  <Edit2 size={10} /> Edit
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 text-sm font-semibold text-slate-600"><Mail size={16} className="text-slate-400 shrink-0"/> <span className="truncate break-all">{profile?.user?.email || 'N/A'}</span></div>
+                <div className="flex items-center gap-3 text-sm font-semibold text-slate-600"><Phone size={16} className="text-slate-400 shrink-0"/> <span>{profile?.mobileNumber || 'Not Specified'}</span></div>
+                <div className="flex items-center gap-3 text-sm font-semibold text-slate-600"><User size={16} className="text-slate-400 shrink-0"/> <span>{profile?.gender || 'Not Specified'}</span></div>
+                {profile?.linkedinUrl && (
+                  <div className="flex items-center gap-3 text-sm font-semibold text-slate-600">
+                    <Linkedin size={16} className="text-slate-400 shrink-0"/> 
+                    <a href={profile.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline truncate">LinkedIn Profile</a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Verification Document */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                 <h4 className="font-bold text-[#F47C20] text-sm uppercase tracking-wider flex items-center gap-2"><Shield size={16}/> Verification Document</h4>
+                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    profile?.verificationStatus === 'VERIFIED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                    profile?.verificationStatus === 'PENDING' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                    'bg-red-50 text-red-600 border border-red-100'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${
+                      profile?.verificationStatus === 'VERIFIED' ? 'bg-emerald-500' :
+                      profile?.verificationStatus === 'PENDING' ? 'bg-amber-500' : 'bg-red-500'
+                    }`}></div> 
+                    {profile?.verificationStatus || 'UNVERIFIED'}
+                  </span>
+              </div>
+              <div className="p-6">
+                {docLoading ? (
+                  <p className="text-sm text-slate-500">Loading document data...</p>
+                ) : documentUrl ? (
+                  <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-red-100 text-red-500 rounded-xl flex justify-center items-center shrink-0 shadow-sm">
+                        <FileText size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 break-words">{documentMeta?.documentName || 'Verification_Document.pdf'}</p>
+                        <p className="text-xs font-semibold text-slate-500 mt-1">Uploaded: {documentMeta?.uploadDate ? new Date(documentMeta.uploadDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown'}</p>
+                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mt-0.5">Type: {documentMeta?.documentType || 'Verification Document'}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-row gap-3 w-full mt-2">
+                      <button 
+                        onClick={handleViewDocument}
+                        className={`${smallActionBtnStyle} flex-1`}
+                      >
+                        <ExternalLink size={14} /> View
+                      </button>
+                      <button 
+                        onClick={handleDownloadDocument}
+                        className={`${smallActionBtnStyle} flex-1`}
+                      >
+                        <Download size={14} /> Download
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm font-medium text-slate-500 italic">No document available.</p>
+                )}
+              </div>
+            </div>
+
           </div>
 
-          <div className="profile-section">
-            <div className="section-header">
-              <h3 className="section-title">Education</h3>
-            </div>
-            <div className="education-list">
-              {education.map(edu => (
-                <div key={edu.id} className="education-item">
-                  <div className="edu-icon"><Briefcase size={20} /></div>
-                  <div className="edu-details">
-                    <h4 className="edu-degree">{edu.degree}</h4>
-                    <p className="edu-school">{edu.school}</p>
-                    <p className="edu-year">{edu.year}</p>
+          {/* RIGHT COLUMN */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            
+            {/* Professional Information */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                 <h4 className="font-bold text-[#F47C20] text-sm uppercase tracking-wider flex items-center gap-2"><Briefcase size={16}/> Professional Profile</h4>
+                 <button onClick={() => setShowProfessionalModal(true)} className="px-3 py-1.5 bg-[#FFF4EB] border border-[#F47C20] text-[#F47C20] rounded-lg text-[11px] font-bold uppercase tracking-wider hover:bg-white hover:text-[#F47C20] focus:outline-none focus:ring-2 focus:ring-[#F47C20] transition-all flex items-center gap-1.5 shadow-sm">
+                   <Edit2 size={12} /> Edit Details
+                 </button>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Company</p>
+                    <p className="text-sm font-extrabold text-slate-800">{profile?.company || 'Not Specified'}</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Designation</p>
+                    <p className="text-sm font-extrabold text-slate-800">{profile?.designation || 'Not Specified'}</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Department</p>
+                    <p className="text-sm font-extrabold text-slate-800">{profile?.department || 'Not Specified'}</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Passing Year</p>
+                    <p className="text-sm font-extrabold text-slate-800">{profile?.passingYear || 'Not Specified'}</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 sm:col-span-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Degree</p>
+                    <p className="text-sm font-extrabold text-slate-800">{profile?.degree || 'Not Specified'}</p>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
+
+
+
+
+
+            {/* Change Password (From Settings) */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                 <h4 className="font-bold text-[#F47C20] text-sm uppercase tracking-wider flex items-center gap-2"><Lock size={16}/> Security & Password</h4>
+              </div>
+              <div className="p-6">
+                <form onSubmit={handlePasswordChange} className="space-y-5 max-w-md">
+                  <div className="relative">
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Current Password</label>
+                    <div className="relative">
+                      <input 
+                        type={showPwd.current ? "text" : "password"}
+                        value={passwordForm.currentPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                        required
+                        className="w-full h-11 pl-4 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" 
+                      />
+                      <button type="button" onClick={() => setShowPwd({...showPwd, current: !showPwd.current})} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
+                        {showPwd.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">New Password</label>
+                    <div className="relative">
+                      <input 
+                        type={showPwd.new ? "text" : "password"}
+                        value={passwordForm.newPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                        required
+                        minLength={6}
+                        className="w-full h-11 pl-4 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" 
+                      />
+                      <button type="button" onClick={() => setShowPwd({...showPwd, new: !showPwd.new})} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
+                        {showPwd.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Confirm New Password</label>
+                    <div className="relative">
+                      <input 
+                        type={showPwd.confirm ? "text" : "password"}
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                        required
+                        minLength={6}
+                        className="w-full h-11 pl-4 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" 
+                      />
+                      <button type="button" onClick={() => setShowPwd({...showPwd, confirm: !showPwd.confirm})} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
+                        {showPwd.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  <button 
+                    type="submit" 
+                    disabled={isChangingPwd}
+                    className={`${actionBtnStyle} w-full mt-2`}
+                  >
+                    {isChangingPwd ? 'Updating Password...' : 'Update Password'}
+                  </button>
+                </form>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
 
-      {/* Basic Info Modal */}
-      <Modal
-        isOpen={showBasicModal}
-        onClose={() => setShowBasicModal(false)}
-        title="Edit Basic Information"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setShowBasicModal(false)}>Cancel</Button>
-            <Button onClick={handleUpdateBasic}>Save Changes</Button>
-          </>
-        }
-      >
-        <div className="form-group">
-          <Input 
-            label="Full Name"
-            value={basicForm.name}
-            onChange={e => setBasicForm({...basicForm, name: e.target.value})}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            label="Role & Company"
-            value={basicForm.role}
-            onChange={e => setBasicForm({...basicForm, role: e.target.value})}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            type="email"
-            label="Email"
-            value={basicForm.email}
-            onChange={e => setBasicForm({...basicForm, email: e.target.value})}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            label="Phone"
-            value={basicForm.phone}
-            onChange={e => setBasicForm({...basicForm, phone: e.target.value})}
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            label="Location"
-            value={basicForm.location}
-            onChange={e => setBasicForm({...basicForm, location: e.target.value})}
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            type="url"
-            label="LinkedIn URL"
-            placeholder="https://linkedin.com/in/..."
-            value={basicForm.linkedin}
-            onChange={e => setBasicForm({...basicForm, linkedin: e.target.value})}
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            type="url"
-            label="GitHub URL"
-            placeholder="https://github.com/..."
-            value={basicForm.github}
-            onChange={e => setBasicForm({...basicForm, github: e.target.value})}
-          />
-        </div>
+      {/* MODALS */}
+      <Modal isOpen={showPersonalModal} onClose={() => setShowPersonalModal(false)} title="Edit Contact Details">
+        <form onSubmit={(e) => { e.preventDefault(); handleSave('personal'); }}>
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Mobile Number</label>
+              <input type="text" value={personalForm.mobileNumber} onChange={e => setPersonalForm({...personalForm, mobileNumber: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Gender</label>
+              <select value={personalForm.gender} onChange={e => setPersonalForm({...personalForm, gender: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all cursor-pointer">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">LinkedIn Profile URL</label>
+              <input type="url" value={personalForm.linkedinUrl} onChange={e => setPersonalForm({...personalForm, linkedinUrl: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button type="button" onClick={() => setShowPersonalModal(false)} className={actionBtnStyle}>Cancel</button>
+            <button type="submit" disabled={isSaving} className={actionBtnStyle}>
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </Modal>
 
-      {/* About Me Modal */}
-      <Modal
-        isOpen={showAboutModal}
-        onClose={() => setShowAboutModal(false)}
-        title="Edit Bio"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setShowAboutModal(false)}>Cancel</Button>
-            <Button onClick={handleUpdateAbout}>Save Changes</Button>
-          </>
-        }
-      >
-        <div className="form-group">
-          <label className="form-label">Bio</label>
-          <textarea 
-            className="form-input" 
-            rows={6} 
-            placeholder="Tell us about your professional journey..."
-            value={aboutForm}
-            onChange={e => setAboutForm(e.target.value)}
-            required
-          ></textarea>
-        </div>
+      <Modal isOpen={showProfessionalModal} onClose={() => setShowProfessionalModal(false)} title="Edit Professional Profile">
+        <form onSubmit={(e) => { e.preventDefault(); handleSave('professional'); }}>
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Current Company</label>
+              <input type="text" value={professionalForm.company} onChange={e => setProfessionalForm({...professionalForm, company: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Designation</label>
+              <input type="text" value={professionalForm.designation} onChange={e => setProfessionalForm({...professionalForm, designation: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Department</label>
+              <select value={professionalForm.department} onChange={e => setProfessionalForm({...professionalForm, department: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all cursor-pointer">
+                <option value="">Select Department</option>
+                {departments.map(d => <option key={d.code || d.name} value={d.name}>{d.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Degree</label>
+                <input type="text" value={professionalForm.degree} onChange={e => setProfessionalForm({...professionalForm, degree: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Passing Year</label>
+                <input type="number" value={professionalForm.passingYear} onChange={e => setProfessionalForm({...professionalForm, passingYear: e.target.value})} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] transition-all" />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button type="button" onClick={() => setShowProfessionalModal(false)} className={actionBtnStyle}>Cancel</button>
+            <button type="submit" disabled={isSaving} className={actionBtnStyle}>
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </Modal>
 
-      {/* Work Modal */}
-      <Modal
-        isOpen={showWorkModal}
-        onClose={closeWorkModal}
-        title={editingWork ? 'Edit Work Experience' : 'Add Work Experience'}
-        footer={
-          <>
-            <Button variant="outline" onClick={closeWorkModal}>Cancel</Button>
-            <Button onClick={handleWorkSubmit}>{editingWork ? 'Save Changes' : 'Add Experience'}</Button>
-          </>
-        }
-      >
-        <div className="form-group">
-          <Input 
-            label="Job Title"
-            value={workForm.title}
-            onChange={e => setWorkForm({...workForm, title: e.target.value})}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            label="Company"
-            value={workForm.company}
-            onChange={e => setWorkForm({...workForm, company: e.target.value})}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            label="Duration/Year"
-            value={workForm.year}
-            onChange={e => setWorkForm({...workForm, year: e.target.value})}
-            required
-          />
-        </div>
-      </Modal>
+      {/* Document Viewer Modal */}
+      <DocumentViewerModal 
+        isOpen={showDocumentModal}
+        onClose={() => setShowDocumentModal(false)}
+        documentUrl={docBlobUrl}
+        fileName={documentMeta?.documentName}
+        alumniName={profile?.user?.name}
+        rollNumber={profile?.rollNumber}
+        uploadDate={documentMeta?.uploadDate}
+      />
 
-      {/* Education Modal */}
-      <Modal
-        isOpen={showEduModal}
-        onClose={closeEduModal}
-        title={editingEdu ? 'Edit Education' : 'Add Education'}
-        footer={
-          <>
-            <Button variant="outline" onClick={closeEduModal}>Cancel</Button>
-            <Button onClick={handleEduSubmit}>{editingEdu ? 'Save Changes' : 'Add Education'}</Button>
-          </>
-        }
-      >
-        <div className="form-group">
-          <Input 
-            label="Degree"
-            value={eduForm.degree}
-            onChange={e => setEduForm({...eduForm, degree: e.target.value})}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            label="School"
-            value={eduForm.school}
-            onChange={e => setEduForm({...eduForm, school: e.target.value})}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <Input 
-            label="Year/Batch"
-            value={eduForm.year}
-            onChange={e => setEduForm({...eduForm, year: e.target.value})}
-            required
-          />
-        </div>
-      </Modal>
     </DashboardLayout>
   );
 }

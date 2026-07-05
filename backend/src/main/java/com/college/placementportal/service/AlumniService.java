@@ -23,12 +23,23 @@ public class AlumniService {
 
     @Autowired
     private JobRepository jobRepository;
+
+    @Autowired
+    private AlumniDocumentService alumniDocumentService;
     
     @Autowired
     private ApplicationRepository applicationRepository;
 
     public Alumni getAlumniEntity(Long userId) {
         return alumniRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("Alumni profile not found for user ID: " + userId));
+    }
+
+    
+    public List<AlumniResponseDto> getAlumniDirectory() {
+        return alumniRepository.findByVerificationStatus(com.college.placementportal.enums.VerificationStatus.VERIFIED)
+                .stream()
+                .map(this::mapToDto)
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public AlumniResponseDto getAlumniProfile(Long userId) {
@@ -50,7 +61,20 @@ public class AlumniService {
         alumni.setCompany(updatedAlumni.getCompany());
         alumni.setDesignation(updatedAlumni.getDesignation());
         alumni.setPassingYear(updatedAlumni.getPassingYear());
+        alumni.setLinkedinUrl(updatedAlumni.getLinkedinUrl());
+        alumni.setDegree(updatedAlumni.getDegree());
+        alumni.setMobileNumber(updatedAlumni.getMobileNumber());
+        alumni.setGender(updatedAlumni.getGender());
+        alumni.setDepartment(updatedAlumni.getDepartment());
         return mapToDto(alumniRepository.save(alumni));
+    }
+
+    public String updateProfileImage(Long userId, org.springframework.web.multipart.MultipartFile image) {
+        Alumni alumni = getAlumniEntity(userId);
+        String imageUrl = alumniDocumentService.storeDocument(image, alumni.getRollNumber() + "_profile");
+        alumni.setProfileImageUrl(imageUrl);
+        alumniRepository.save(alumni);
+        return imageUrl;
     }
 
     public AlumniResponseDto mapToDto(Alumni alumni) {
@@ -66,8 +90,8 @@ public class AlumniService {
         dto.setMobileNumber(alumni.getMobileNumber());
         dto.setGender(alumni.getGender());
         dto.setLinkedinUrl(alumni.getLinkedinUrl());
-        dto.setVerificationDocumentUrl(alumni.getVerificationDocumentUrl());
-        dto.setProfileImageUrl(alumni.getProfileImageUrl());
+        dto.setVerificationDocumentUrl(extractFileName(alumni.getVerificationDocumentUrl()));
+        dto.setProfileImageUrl(extractFileName(alumni.getProfileImageUrl()));
         dto.setOcrVerified(alumni.getOcrVerified());
         dto.setOcrExtractedName(alumni.getOcrExtractedName());
         dto.setOcrExtractedRollNumber(alumni.getOcrExtractedRollNumber());
@@ -83,5 +107,13 @@ public class AlumniService {
             dto.setUser(userDto);
         }
         return dto;
+    }
+
+    private String extractFileName(String urlOrFileName) {
+        if (urlOrFileName == null) return null;
+        if (urlOrFileName.contains("/")) {
+            return urlOrFileName.substring(urlOrFileName.lastIndexOf("/") + 1);
+        }
+        return urlOrFileName;
     }
 }

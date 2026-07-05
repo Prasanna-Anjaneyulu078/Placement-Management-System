@@ -18,4 +18,5 @@ export { default as LoadingSpinner } from './LoadingSpinner';
 export { default as Skeleton } from './Skeleton';
 export { default as Pagination } from './Pagination';
 export { default as Toast } from './Toast';
+export { default as DocumentViewerModal } from './DocumentViewerModal';
 export { default as PrivateRoute } from './PrivateRoute';

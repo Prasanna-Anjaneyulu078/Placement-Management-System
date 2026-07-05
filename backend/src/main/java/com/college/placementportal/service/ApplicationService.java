@@ -79,4 +79,15 @@ public class ApplicationService {
         app.setStatus(status);
         return applicationRepository.save(app);
     }
+
+    public List<Application> getApplicationsForAlumniJobs(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+        List<Job> alumniJobs = jobRepository.findByPostedById(user.getId());
+        List<Long> jobIds = alumniJobs.stream().map(job -> job.getId()).collect(java.util.stream.Collectors.toList());
+        
+        if (jobIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return applicationRepository.findByJobIdIn(jobIds);
+    }
 }

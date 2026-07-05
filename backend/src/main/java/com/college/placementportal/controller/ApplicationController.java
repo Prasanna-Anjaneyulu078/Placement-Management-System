@@ -11,6 +11,16 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/applications")
 public class ApplicationController {
 
+    @GetMapping("/alumni/my-posted-jobs")
+    public ResponseEntity<?> getApplicationsForMyJobs(Authentication authentication) {
+        try {
+            return ResponseEntity.ok(applicationService.getApplicationsForAlumniJobs(authentication.getName()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+
     @Autowired
     private ApplicationService applicationService;
 

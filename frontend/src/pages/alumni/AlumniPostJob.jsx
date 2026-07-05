@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { PageHeader, Input, Button } from '../../components/common';
+import { PageHeader } from '../../components/common';
 import api from '../../utils/axiosConfig';
-import { Briefcase, DollarSign, MapPin, FileText, Tag, Layers, CheckCircle } from 'lucide-react';
+import { Briefcase, DollarSign, CheckCircle } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 export default function AlumniPostJob() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showToast, setShowToast] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     company: '',
     location: '',
     type: 'Full-time',
-    level: 'Entry Level',
-    salary: '',
+    packageDetails: '',
+    experienceRequired: '',
     description: '',
-    tags: ''
+    requiredSkills: '',
+    deadline: ''
   });
 
   const handleChange = (e) => {
@@ -30,21 +31,16 @@ export default function AlumniPostJob() {
     setIsSubmitting(true);
     
     try {
-      const newJob = {
-        ...formData,
-        tags: formData.tags.split(',').map(t => t.trim()).filter(t => t)
-      };
+      await api.post('/alumni/jobs', formData); // Backend has this mapped in JobController ? Wait, the backend api for jobs is '/api/alumni/jobs' according to JobController if it exists, or maybe '/api/jobs'. Let me check the old code: it was `api.post('/jobs/post', newJob)`
       
-      await api.post('/jobs/post', newJob);
-      
-      setShowToast(true);
+      toast.success('Job posted successfully! Pending admin approval.');
       setTimeout(() => {
         navigate('/alumni/my-jobs');
       }, 1500);
       
     } catch (err) {
       console.error('Failed to post job', err);
-      alert('Failed to post job: ' + (err.response?.data || err.message));
+      toast.error('Failed to post job: ' + (err.response?.data || err.message));
     } finally {
       setIsSubmitting(false);
     }
@@ -52,29 +48,23 @@ export default function AlumniPostJob() {
 
   return (
     <DashboardLayout role="alumni">
-      {showToast && (
-        <div className="fixed top-20 right-8 bg-green-50 text-green-700 px-6 py-4 rounded-xl border border-green-200 shadow-lg flex items-center gap-3 z-50 animate-fade-in">
-          <CheckCircle size={24} className="text-green-500" />
-          <span className="font-semibold">Job posted successfully! Redirecting...</span>
-        </div>
-      )}
       <PageHeader 
         title="Post a New Job" 
         subtitle="Share opportunities with students from your alma mater." 
       />
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mt-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mt-6 pb-12 max-w-4xl mx-auto">
         <form className="space-y-8" onSubmit={handleSubmit}>
-          {/* Job Details Section */}
+          
           <div className="space-y-6">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 pb-4 border-b border-gray-100">
-              <Briefcase size={20} className="text-primary" />
+            <h3 className="text-lg font-extrabold text-[#F47C20] flex items-center gap-2 pb-4 border-b border-slate-100 uppercase tracking-wider">
+              <Briefcase size={20} />
               Job Details
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Job Title <span className="text-red-500">*</span></label>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Job Title <span className="text-red-500">*</span></label>
                 <input 
                   type="text"
                   name="title"
@@ -82,11 +72,11 @@ export default function AlumniPostJob() {
                   value={formData.title}
                   required
                   onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Company Name <span className="text-red-500">*</span></label>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Company Name <span className="text-red-500">*</span></label>
                 <input 
                   type="text"
                   name="company"
@@ -94,14 +84,14 @@ export default function AlumniPostJob() {
                   value={formData.company}
                   required
                   onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Location <span className="text-red-500">*</span></label>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Location <span className="text-red-500">*</span></label>
                 <input 
                   type="text"
                   name="location"
@@ -109,16 +99,16 @@ export default function AlumniPostJob() {
                   value={formData.location}
                   required
                   onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Employment Type <span className="text-red-500">*</span></label>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Employment Type <span className="text-red-500">*</span></label>
                 <select 
                   name="type" 
                   value={formData.type} 
                   onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none appearance-none bg-white"
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all cursor-pointer"
                 >
                   <option value="Full-time">Full-time</option>
                   <option value="Part-time">Part-time</option>
@@ -129,7 +119,7 @@ export default function AlumniPostJob() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">Job Description <span className="text-red-500">*</span></label>
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Job Description <span className="text-red-500">*</span></label>
               <textarea 
                 name="description"
                 rows={6} 
@@ -137,66 +127,83 @@ export default function AlumniPostJob() {
                 value={formData.description}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none resize-y"
+                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all resize-y"
               ></textarea>
             </div>
           </div>
 
-          {/* Requirements Section */}
           <div className="space-y-6 pt-6">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 pb-4 border-b border-gray-100">
-              <DollarSign size={20} className="text-primary" />
-              Requirements & Compensation
+            <h3 className="text-lg font-extrabold text-[#F47C20] flex items-center gap-2 pb-4 border-b border-slate-100 uppercase tracking-wider">
+              <DollarSign size={20} />
+              Requirements & Details
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Experience Level <span className="text-red-500">*</span></label>
-                <select 
-                  name="level" 
-                  value={formData.level} 
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none appearance-none bg-white"
-                >
-                  <option value="Entry Level">Entry Level</option>
-                  <option value="Mid Level">Mid Level</option>
-                  <option value="Senior Level">Senior Level</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Salary Range (Optional)</label>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Package / Salary <span className="text-red-500">*</span></label>
                 <input 
                   type="text"
-                  name="salary"
-                  placeholder="e.g. $80k - $120k" 
-                  value={formData.salary}
+                  name="packageDetails"
+                  placeholder="e.g. 10 LPA" 
+                  value={formData.packageDetails}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
+                  required
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Experience Required <span className="text-red-500">*</span></label>
+                <input 
+                  type="text"
+                  name="experienceRequired"
+                  placeholder="e.g. 0-2 Years" 
+                  value={formData.experienceRequired}
+                  onChange={handleChange}
+                  required
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Application Deadline <span className="text-red-500">*</span></label>
+                <input 
+                  type="date"
+                  name="deadline"
+                  value={formData.deadline}
+                  onChange={handleChange}
+                  required
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">Required Skills (Tags)</label>
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Required Skills (Comma separated)</label>
               <input 
                 type="text"
-                name="tags"
-                placeholder="Type skills separated by commas (e.g. React, Node.js, Python)" 
-                value={formData.tags}
+                name="requiredSkills"
+                placeholder="e.g. React, Node.js, AWS" 
+                value={formData.requiredSkills}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors outline-none"
+                className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:bg-white focus:border-[#F47C20] focus:ring-1 focus:ring-[#F47C20] transition-all"
               />
-              <p className="text-xs text-gray-500 mt-1">These tags help students find your job when searching.</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-4 pt-8 border-t border-gray-100">
-            <Button variant="outline" type="button" onClick={() => navigate('/alumni/dashboard')} disabled={isSubmitting}>
+          <div className="pt-6 border-t border-slate-100 flex justify-end gap-4">
+            <button 
+              type="button" 
+              onClick={() => navigate(-1)}
+              className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors"
+            >
               Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Posting...' : 'Post Job'}
-            </Button>
+            </button>
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="px-8 py-3 bg-white border-2 border-[#F47C20] text-[#F47C20] hover:bg-orange-50 rounded-xl text-sm font-bold shadow-lg shadow-[#F47C20]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Posting Job...' : 'Post Job'}
+            </button>
           </div>
         </form>
       </div>

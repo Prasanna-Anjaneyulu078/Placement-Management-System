@@ -107,4 +107,29 @@ public class ResumeService {
         Student student = studentService.getStudentEntity(userId);
         return resumeRepository.findByStudentId(student.getId()).orElse(null);
     }
+
+    /**
+     * Fetch resume entity directly by student primary-key ID (not userId).
+     * Used by admin endpoints.
+     */
+    public Resume getResumeByStudentId(Long studentId) {
+        return resumeRepository.findByStudentId(studentId).orElse(null);
+    }
+
+    /**
+     * Load a file resource given an absolute file-system path.
+     * Used by admin resume endpoints that already hold the stored path.
+     */
+    public Resource loadFileAsResourceByPath(String filePath) {
+        try {
+            java.nio.file.Path path = java.nio.file.Paths.get(filePath).normalize();
+            Resource resource = new UrlResource(java.util.Objects.requireNonNull(path.toUri()));
+            if (resource.exists()) {
+                return resource;
+            }
+            throw new RuntimeException("File not found: " + filePath);
+        } catch (Exception ex) {
+            throw new RuntimeException("File not found: " + filePath, ex);
+        }
+    }
 }

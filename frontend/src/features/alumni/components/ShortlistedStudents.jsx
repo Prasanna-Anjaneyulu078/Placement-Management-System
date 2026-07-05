@@ -4,8 +4,13 @@ import { Star, Mail, Briefcase } from 'lucide-react';
 import { Card, Avatar, Badge } from '../../../components/common';
 import './ShortlistedStudents.css';
 
-export default function ShortlistedStudents({ applicants, users }) {
+export default function ShortlistedStudents({ applicants = [], users = [], jobs = [] }) {
   const navigate = useNavigate();
+
+  // Safely derive applicants if jobs is passed instead
+  const displayApplicants = applicants.length > 0 
+    ? applicants 
+    : jobs.flatMap(j => (j.applications || []).map(a => ({...a, role: j.title || a.role}))).filter(a => a.status === 'SHORTLISTED' || a.status === 'SELECTED');
 
   return (
     <Card 
@@ -15,9 +20,9 @@ export default function ShortlistedStudents({ applicants, users }) {
       noPadding
     >
       <div className="alumni-job-list">
-        {applicants.length > 0 ? (
-          applicants.slice(0, 5).map((app) => {
-            const student = users.find(u => u.id === app.userId);
+        {displayApplicants.length > 0 ? (
+          displayApplicants.slice(0, 5).map((app) => {
+            const student = users.find(u => u.id === app.userId) || app.student || null;
             return (
               <div key={app.id} className="alumni-shortlisted-item">
                 <Avatar size="md" src={`https://i.pravatar.cc/150?u=${app.userId}`} alt={student?.name} />
@@ -31,10 +36,10 @@ export default function ShortlistedStudents({ applicants, users }) {
                   </p>
                   <div className="alumni-student-meta">
                     <span className="alumni-student-meta-item">
-                      <Mail size={12} /> {student?.email.split('@')[0]}...
+                      <Mail size={12} /> {student?.email?.split('@')[0] || 'Unknown'}...
                     </span>
                     <span className="alumni-student-meta-item">
-                      <Briefcase size={12} /> {app.role.split(' ')[0]}...
+                      <Briefcase size={12} /> {(app.role || '').split(' ')[0]}...
                     </span>
                   </div>
                 </div>
@@ -45,7 +50,7 @@ export default function ShortlistedStudents({ applicants, users }) {
           <p className="alumni-empty-state">No students shortlisted yet.</p>
         )}
       </div>
-      {applicants.length > 0 && (
+      {displayApplicants.length > 0 && (
         <div className="alumni-footer-link">
           <span 
             className="alumni-manage-link"

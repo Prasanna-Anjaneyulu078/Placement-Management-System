@@ -18,4 +18,6 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("DELETE FROM Application a WHERE a.job.id IN :jobIds")
     void deleteByJobIdIn(@org.springframework.data.repository.query.Param("jobIds") List<Long> jobIds);
+    
+    List<Application> findByJobIdIn(List<Long> jobIds);
 }

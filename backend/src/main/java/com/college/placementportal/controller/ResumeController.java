@@ -3,6 +3,7 @@ package com.college.placementportal.controller;
 import com.college.placementportal.entity.Resume;
 import com.college.placementportal.entity.User;
 import com.college.placementportal.service.ResumeService;
+import com.college.placementportal.util.FileDownloadHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -48,14 +49,19 @@ public class ResumeController {
         try {
             User user = (User) authentication.getPrincipal();
             Resource resource = resumeService.loadFileAsResource(user.getId());
-            
-            String filename = resource.getFilename();
-            String contentType = filename != null && filename.endsWith(".pdf") ? "application/pdf" : "application/octet-stream";
-            String attachmentFilename = filename != null ? filename : "resume";
-            
+            Resume resumeDetails = resumeService.getResumeDetails(user.getId());
+
+            String storedFilename = resource.getFilename();
+            String ext = FileDownloadHelper.extractExtension(storedFilename);
+            String rollNumber = (resumeDetails != null && resumeDetails.getStudent() != null)
+                    ? resumeDetails.getStudent().getRollNumber() : null;
+            String downloadName = FileDownloadHelper.buildFilename(rollNumber, "Resume", ext);
+
+            String contentType = "pdf".equals(ext) ? "application/pdf" : "application/octet-stream";
+
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + attachmentFilename + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadName + "\"")
                     .body(resource);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
@@ -86,13 +92,19 @@ public class ResumeController {
         try {
             User user = (User) authentication.getPrincipal();
             Resource resource = resumeService.loadFileAsResource(user.getId());
-            
-            String filename = resource.getFilename();
-            String contentType = (filename != null && filename.toLowerCase().endsWith(".pdf")) ? "application/pdf" : "application/octet-stream";
-            
+            Resume resumeDetails = resumeService.getResumeDetails(user.getId());
+
+            String storedFilename = resource.getFilename();
+            String ext = FileDownloadHelper.extractExtension(storedFilename);
+            String rollNumber = (resumeDetails != null && resumeDetails.getStudent() != null)
+                    ? resumeDetails.getStudent().getRollNumber() : null;
+            String viewName = FileDownloadHelper.buildFilename(rollNumber, "Resume", ext);
+
+            String contentType = "pdf".equals(ext) ? "application/pdf" : "application/octet-stream";
+
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + (filename != null ? filename : "resume") + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + viewName + "\"")
                     .body(resource);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();

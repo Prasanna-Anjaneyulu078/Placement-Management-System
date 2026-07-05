@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { generateAvatarSVG } from '../../utils/avatarUtils';
 import { 
   MoreVertical, Eye, Edit2, Trash2, 
   Monitor, User, Calendar, Star, 
@@ -8,11 +9,10 @@ import {
 
 export default function StudentProfileCard({ user }) {
   if (!user) return null;
-
   // Fallbacks for data mapping
   const name = user.name || 'N/A';
   const rollNo = user.rollNo || user.rollNumber || 'N/A';
-  const img = user.img || user.profileImageUrl || `https://ui-avatars.com/api/?name=${name}&background=F47C20&color=fff&size=150`;
+  const img = user.img || user.profileImageUrl || generateAvatarSVG(name, 'F47C20', 'fff');
   const department = user.department || 'N/A';
   const section = user.section || user.semester ? `Semester ${user.semester}` : 'N/A';
   const batch = user.batch || user.academicYear || 'N/A';

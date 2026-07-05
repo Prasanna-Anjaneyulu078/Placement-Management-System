@@ -128,19 +128,26 @@ public class AuthService {
             throw new DuplicateEntryException("An alumni account with this Roll Number already exists. Please login using your existing account or contact the administrator.");
         }
 
-        // Validate Document presence and type
+        // Validate Document presence and type — PDF only
         if (document == null || document.isEmpty()) {
             throw new RuntimeException("Verification document is required.");
         }
 
-        long maxFileSize = 5 * 1024 * 1024; // 5 MB
+        long maxFileSize = 10 * 1024 * 1024; // 10 MB
         if (document.getSize() > maxFileSize) {
-            throw new RuntimeException("Document size exceeds the maximum limit of 5MB.");
+            throw new RuntimeException("File size exceeds the maximum allowed limit of 10 MB.");
         }
 
         String contentType = document.getContentType();
-        if (contentType == null || !(contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("application/pdf"))) {
-            throw new RuntimeException("Invalid document format. Only JPG, JPEG, PNG, and PDF are allowed.");
+        String rawFilename = document.getOriginalFilename();
+        String originalFilename = (rawFilename != null) ? rawFilename.toLowerCase() : "";
+        boolean isPdf = "application/pdf".equals(contentType) || originalFilename.endsWith(".pdf");
+        if (!isPdf) {
+            throw new DocumentVerificationException(
+                "Only PDF documents are allowed for alumni verification. " +
+                "Please upload a valid PDF version of your College ID Card, Degree Certificate, " +
+                "Provisional Certificate, Hall Ticket, or Consolidated Marks Memo."
+            );
         }
 
         if (user == null) {
@@ -170,6 +177,8 @@ public class AuthService {
         // Store document and get URL
         String documentUrl = alumniDocumentService.storeDocument(document, request.getRollNumber());
         alumni.setVerificationDocumentUrl(documentUrl);
+        alumni.setVerificationDocumentName(document.getOriginalFilename());
+        alumni.setVerificationDocumentUploadDate(java.time.LocalDateTime.now());
 
         // ---- OCR Verification (single pass) ----
         DocumentVerificationService.OcrResult ocrResult =

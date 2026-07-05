@@ -59,4 +59,5 @@ public class AlumniResponseDto {
     public void setOcrExtractedRollNumber(String ocrExtractedRollNumber) { this.ocrExtractedRollNumber = ocrExtractedRollNumber; }
     public String getOcrDetectedCollege() { return ocrDetectedCollege; }
     public void setOcrDetectedCollege(String ocrDetectedCollege) { this.ocrDetectedCollege = ocrDetectedCollege; }
+
 }

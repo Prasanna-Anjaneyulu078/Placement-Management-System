@@ -11,6 +11,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.college.placementportal.util.FileDownloadHelper;
 import java.util.Map;
 import java.util.HashMap;
 import com.college.placementportal.dto.response.ProjectDto;
@@ -92,9 +93,22 @@ public class StudentController {
     public ResponseEntity<Resource> downloadProfileImage(@PathVariable String fileName) {
         try {
             Resource resource = profileImageService.loadFileAsResource(fileName);
+            
+            // Extract roll number from format: profile_ROLLNUMBER_timestamp.ext
+            String rollNumber = null;
+            if (fileName != null && fileName.startsWith("profile_")) {
+                String[] parts = fileName.split("_");
+                if (parts.length >= 2) {
+                    rollNumber = parts[1];
+                }
+            }
+            
+            String ext = FileDownloadHelper.extractExtension(fileName);
+            String downloadName = FileDownloadHelper.buildFilename(rollNumber, "ProfilePhoto", ext);
+            
             return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType("image/" + fileName.substring(fileName.lastIndexOf(".") + 1)))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                    .contentType(MediaType.parseMediaType("image/" + ext))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadName + "\"")
                     .body(resource);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();

@@ -69,7 +69,8 @@ export default function DashboardLayout({ children, role = 'student' }) {
         return [
           { icon: LayoutDashboard, label: 'Dashboard', path: '/alumni/dashboard' },
           { icon: Briefcase, label: 'Post Job', path: '/alumni/post-job' },
-          { icon: FileText, label: 'My Jobs', path: '/alumni/my-jobs' },
+          { icon: Briefcase, label: 'My Jobs', path: '/alumni/my-jobs' },
+          { icon: FileText, label: 'Applications', path: '/alumni/applications' },
           { icon: User, label: 'Profile', path: '/alumni/profile' },
         ];
       case 'admin':

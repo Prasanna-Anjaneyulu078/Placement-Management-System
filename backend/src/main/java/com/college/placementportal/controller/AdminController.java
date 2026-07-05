@@ -5,6 +5,11 @@ import com.college.placementportal.service.AdminService;
 import com.college.placementportal.service.ApplicationService;
 import com.college.placementportal.service.ReportExportService;
 import com.college.placementportal.service.AlumniDocumentService;
+import com.college.placementportal.service.ResumeService;
+import com.college.placementportal.service.StudentService;
+import com.college.placementportal.util.FileDownloadHelper;
+import com.college.placementportal.entity.Resume;
+import com.college.placementportal.entity.Student;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +49,12 @@ public class AdminController {
 
     @Autowired
     private AlumniDocumentService alumniDocumentService;
+
+    @Autowired
+    private ResumeService resumeService;
+
+    @Autowired
+    private StudentService studentService;
 
     @GetMapping("/stats")
     public ResponseEntity<?> getStats() {
@@ -119,10 +130,79 @@ public class AdminController {
         } catch (Exception ex) {
             // Fallback
         }
+        // Extract roll number from stored filename pattern: alumni_doc_ROLLNUMBER_TIMESTAMP.ext
+        String rollNumber = extractRollFromAlumniFilename(fileName);
+        String ext = FileDownloadHelper.extractExtension(fileName);
+        String downloadName = FileDownloadHelper.buildFilename(rollNumber, "VerificationDocument", ext);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType != null ? contentType : "application/octet-stream"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + downloadName + "\"")
                 .body(resource);
+    }
+
+    /** Extract the roll number segment from a stored alumni filename: alumni_doc_ROLLNUMBER_TIMESTAMP.ext */
+    private String extractRollFromAlumniFilename(String fileName) {
+        if (fileName == null) return null;
+        // Pattern: alumni_doc_<ROLL>_<TIMESTAMP>.ext
+        try {
+            String base = fileName.contains(".") ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+            String[] parts = base.split("_", 4);
+            // parts: ["alumni", "doc", ROLL, TIMESTAMP]
+            if (parts.length >= 3) return parts[2];
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Admin: Student Resume View & Download
+    // -------------------------------------------------------------------------
+
+    /**
+     * Admin views a student's resume inline (PDF viewer).
+     */
+    @GetMapping("/students/{studentId}/resume/view")
+    public ResponseEntity<Resource> adminViewStudentResume(@PathVariable("studentId") @NonNull Long studentId) {
+        try {
+            Student student = studentService.getStudentEntityById(studentId);
+            Resume resume = resumeService.getResumeByStudentId(student.getId());
+            if (resume == null) return ResponseEntity.notFound().build();
+
+            Resource resource = resumeService.loadFileAsResourceByPath(resume.getFilePath());
+            String ext = FileDownloadHelper.extractExtension(resume.getFileName());
+            String viewName = FileDownloadHelper.buildFilename(student.getRollNumber(), "Resume", ext);
+            String contentType = "pdf".equals(ext) ? "application/pdf" : "application/octet-stream";
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + viewName + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Admin downloads a student's resume with a standardized filename.
+     */
+    @GetMapping("/students/{studentId}/resume/download")
+    public ResponseEntity<Resource> adminDownloadStudentResume(@PathVariable("studentId") @NonNull Long studentId) {
+        try {
+            Student student = studentService.getStudentEntityById(studentId);
+            Resume resume = resumeService.getResumeByStudentId(student.getId());
+            if (resume == null) return ResponseEntity.notFound().build();
+
+            Resource resource = resumeService.loadFileAsResourceByPath(resume.getFilePath());
+            String ext = FileDownloadHelper.extractExtension(resume.getFileName());
+            String downloadName = FileDownloadHelper.buildFilename(student.getRollNumber(), "Resume", ext);
+            String contentType = "pdf".equals(ext) ? "application/pdf" : "application/octet-stream";
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadName + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/jobs/pending")

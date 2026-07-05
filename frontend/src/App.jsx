@@ -14,6 +14,7 @@ import StudentProfile from './pages/student/StudentProfile';
 import StudentJobs from './pages/student/StudentJobs';
 import StudentApplications from './pages/student/StudentApplications';
 import AlumniDashboard from './pages/alumni/AlumniDashboard';
+import AlumniStudentApplications from './pages/alumni/AlumniStudentApplications';
 import AlumniPostJob from './pages/alumni/AlumniPostJob';
 import AlumniMyJobs from './pages/alumni/AlumniMyJobs';
 import AlumniProfile from './pages/alumni/AlumniProfile';
@@ -81,6 +82,7 @@ export default function App() {
 
             {/* Alumni Routes — requires ALUMNI role */}
             <Route path="/alumni/dashboard" element={<PrivateRoute role="ALUMNI"><AlumniDashboard /></PrivateRoute>} />
+            <Route path="/alumni/applications" element={<PrivateRoute role="ALUMNI"><AlumniStudentApplications /></PrivateRoute>} />
             <Route path="/alumni/post-job"  element={<PrivateRoute role="ALUMNI"><AlumniPostJob /></PrivateRoute>} />
             <Route path="/alumni/my-jobs"   element={<PrivateRoute role="ALUMNI"><AlumniMyJobs /></PrivateRoute>} />
             <Route path="/alumni/profile"   element={<PrivateRoute role="ALUMNI"><AlumniProfile /></PrivateRoute>} />
