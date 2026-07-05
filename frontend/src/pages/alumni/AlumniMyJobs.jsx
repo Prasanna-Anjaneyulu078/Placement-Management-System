@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Trash2, Users, X, MapPin, Briefcase, DollarSign, Edit2, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, Modal, LoadingSpinner } from '../../components/common';
+import { PageHeader, Modal, LoadingSpinner, JobCard, JobDetailsModal } from '../../components/common';
 import api from '../../utils/axiosConfig';
 import { toast } from 'react-toastify';
 
@@ -80,124 +80,32 @@ export default function AlumniMyJobs() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {jobs.map((job) => (
-              <div 
+              <JobCard 
                 key={job.id} 
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:border-[#F47C20]/50 transition-all flex flex-col"
-              >
-                <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-base font-extrabold text-slate-800 line-clamp-1">{job.title}</h3>
-                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${getStatusBadge(job.status)}`}>
-                      {job.status}
-                    </span>
-                  </div>
-                  <p className="text-slate-500 text-xs font-semibold flex items-center gap-1.5"><Briefcase size={12}/> {job.company}</p>
-                </div>
-
-                <div className="p-5 flex-1">
-                  <p className="text-slate-600 text-xs font-medium mb-4 line-clamp-3 leading-relaxed">
-                    {job.description}
-                  </p>
-                  
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                      <MapPin size={14} className="text-slate-400" />
-                      <span className="truncate">{job.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                      <DollarSign size={14} className="text-slate-400" />
-                      <span>{job.packageDetails}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                      <Calendar size={14} className="text-slate-400" />
-                      <span>Deadline: {new Date(job.deadline).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
-                  <button 
-                    onClick={() => setViewingJob(job)} 
-                    className="text-[#F47C20] text-xs font-bold hover:underline"
-                  >
-                    View Details
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <button onClick={(e) => { e.stopPropagation(); navigate(`/alumni/applications`); }} className={actionBtnStyle}>
-                      <Users size={12}/> Applicants
-                    </button>
-                    <button onClick={(e) => handleDelete(e, job.id)} className={deleteBtnStyle}>
-                      <Trash2 size={12}/>
-                    </button>
-                  </div>
-                </div>
-              </div>
+                job={job}
+                isAlumni={true}
+                onSelect={setViewingJob}
+                onEdit={() => navigate(`/alumni/edit-job/${job.id}`)}
+                onDelete={(j) => handleDelete({ stopPropagation: () => {} }, j.id)}
+                customStatusBadge={
+                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${getStatusBadge(job.status)}`}>
+                    {job.status}
+                  </span>
+                }
+              />
             ))}
           </div>
         )}
       </div>
 
-      <Modal 
+      <JobDetailsModal 
         isOpen={!!viewingJob} 
         onClose={() => setViewingJob(null)} 
-        title="Job Details"
-        size="lg"
-      >
-        {viewingJob && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-800">{viewingJob.title}</h2>
-                <p className="text-sm font-bold text-[#F47C20] mt-1">{viewingJob.company}</p>
-              </div>
-              <span className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${getStatusBadge(viewingJob.status)}`}>
-                {viewingJob.status}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Location</p>
-                <p className="text-sm font-extrabold text-slate-800">{viewingJob.location}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Package</p>
-                <p className="text-sm font-extrabold text-slate-800">{viewingJob.packageDetails}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Experience</p>
-                <p className="text-sm font-extrabold text-slate-800">{viewingJob.experienceRequired}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Deadline</p>
-                <p className="text-sm font-extrabold text-slate-800">{new Date(viewingJob.deadline).toLocaleDateString()}</p>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Description</h4>
-              <p className="text-sm font-medium text-slate-600 whitespace-pre-wrap">{viewingJob.description}</p>
-            </div>
-
-            {viewingJob.requiredSkills && (
-              <div>
-                <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Required Skills</h4>
-                <div className="flex flex-wrap gap-2">
-                  {viewingJob.requiredSkills.split(',').map((skill, index) => (
-                    <span key={index} className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-bold border border-slate-200">
-                      {skill.trim()}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end pt-4 border-t border-slate-100">
-              <button onClick={() => setViewingJob(null)} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-1.5"><X size={16}/> Close</button>
-            </div>
-          </div>
-        )}
-      </Modal>
+        job={viewingJob}
+        role="alumni"
+        onEdit={(job) => navigate(`/alumni/edit-job/${job.id}`)}
+        onDelete={(job) => handleDelete({ stopPropagation: () => {} }, job.id)}
+      />
 
     </DashboardLayout>
   );

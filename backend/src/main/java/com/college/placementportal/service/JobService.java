@@ -73,10 +73,19 @@ public class JobService {
         job.setDescription(updatedJob.getDescription());
         job.setLocation(updatedJob.getLocation());
         job.setJobType(updatedJob.getJobType());
+        job.setPackageDetails(updatedJob.getPackageDetails());
+        job.setExperienceRequired(updatedJob.getExperienceRequired());
+        job.setRequiredSkills(updatedJob.getRequiredSkills());
+        job.setApplicationLink(updatedJob.getApplicationLink());
         job.setMinCgpa(updatedJob.getMinCgpa());
         job.setEligibleSemester(updatedJob.getEligibleSemester());
         job.setMaxBacklogs(updatedJob.getMaxBacklogs());
         job.setExpiryDate(updatedJob.getExpiryDate());
+        job.setCompanyLogoUrl(updatedJob.getCompanyLogoUrl());
+        job.setJobBannerUrl(updatedJob.getJobBannerUrl());
+        job.setIndustry(updatedJob.getIndustry());
+        job.setCompanySize(updatedJob.getCompanySize());
+        job.setOpenings(updatedJob.getOpenings());
         
         if (!user.getRole().name().equals("ADMIN")) {
             job.setStatus(JobStatus.PENDING);

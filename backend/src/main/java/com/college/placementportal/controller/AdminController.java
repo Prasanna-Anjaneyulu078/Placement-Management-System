@@ -7,6 +7,7 @@ import com.college.placementportal.service.ReportExportService;
 import com.college.placementportal.service.AlumniDocumentService;
 import com.college.placementportal.service.ResumeService;
 import com.college.placementportal.service.StudentService;
+import com.college.placementportal.service.JobService;
 import com.college.placementportal.util.FileDownloadHelper;
 import com.college.placementportal.entity.Resume;
 import com.college.placementportal.entity.Student;
@@ -55,6 +56,9 @@ public class AdminController {
 
     @Autowired
     private StudentService studentService;
+
+    @Autowired
+    private JobService jobService;
 
     @GetMapping("/stats")
     public ResponseEntity<?> getStats() {
@@ -203,6 +207,11 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/jobs")
+    public ResponseEntity<?> getAllJobs() {
+        return ResponseEntity.ok(jobService.getAllJobs());
     }
 
     @GetMapping("/jobs/pending")

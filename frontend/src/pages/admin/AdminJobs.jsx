@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { PageHeader, SearchInput, Table, Modal, Badge, Button, LoadingSpinner } from '../../components/common';
+import { PageHeader, SearchInput, JobCard, LoadingSpinner } from '../../components/common';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../utils/axiosConfig';
 
@@ -10,9 +11,9 @@ export default function AdminJobs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedJob, setSelectedJob] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const navigate = useNavigate();
 
   const fetchJobs = async () => {
     try {
@@ -37,7 +38,6 @@ export default function AdminJobs() {
       });
       toast.success(`Job marked as ${status}`);
       fetchJobs();
-      if (isModalOpen) setIsModalOpen(false);
     } catch (err) {
       console.error('Failed to update job status', err);
       toast.error('Failed to update job status');
@@ -45,8 +45,7 @@ export default function AdminJobs() {
   };
 
   const handleShowDetails = (job) => {
-    setSelectedJob(job);
-    setIsModalOpen(true);
+    navigate(`/admin/jobs/${job.id}`);
   };
 
   const filteredJobs = jobs.filter(job => {
@@ -68,50 +67,7 @@ export default function AdminJobs() {
     currentPage * itemsPerPage
   );
 
-  const headers = ['Job Title', 'Company', 'Posted By', 'Status', 'Actions'];
 
-  const renderRow = (job) => (
-    <tr key={job.id} className="hover:bg-gray-50/50 transition-colors border-b border-gray-100 last:border-0">
-      <td className="py-4 px-6">
-        <span className="font-bold text-gray-900">{job.title}</span>
-      </td>
-      <td className="py-4 px-6 text-gray-600">{job.company}</td>
-      <td className="py-4 px-6 text-gray-600">{job.postedBy?.name || 'Admin'}</td>
-      <td className="py-4 px-6">
-        <Badge variant={job.status}>{job.status}</Badge>
-      </td>
-      <td className="py-4 px-6">
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => handleShowDetails(job)}
-          >
-            Details
-          </Button>
-          {job.status === 'PENDING' && (
-            <>
-              <Button 
-                size="sm" 
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => updateJobStatus(job.id, 'ACTIVE')}
-              >
-                Approve
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-red-600 border-red-200 hover:bg-red-50"
-                onClick={() => updateJobStatus(job.id, 'REJECTED')}
-              >
-                Reject
-              </Button>
-            </>
-          )}
-        </div>
-      </td>
-    </tr>
-  );
 
   return (
     <DashboardLayout role="admin">
@@ -121,7 +77,7 @@ export default function AdminJobs() {
       />
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mt-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+        <div className="flex flex-col md:flex-row justify-start items-center gap-4 mb-6">
           <div className="w-full md:w-96">
             <SearchInput 
               value={searchTerm}
@@ -131,7 +87,7 @@ export default function AdminJobs() {
           </div>
           <div className="w-full md:w-auto">
             <select 
-              className="w-full md:w-48 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium text-gray-700 outline-none transition-all"
+              className="w-full md:w-48 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#F47C20]/20 focus:border-[#F47C20] font-medium text-gray-700 outline-none transition-all"
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
             >
@@ -149,109 +105,42 @@ export default function AdminJobs() {
             <LoadingSpinner size="large" />
             <p className="mt-4 text-gray-500 font-medium">Loading job listings...</p>
           </div>
+        ) : currentJobs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-2xl border border-gray-100">
+            <p className="text-gray-500 font-medium">No jobs found matching your criteria.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
-            <Table 
-              headers={headers}
-              data={currentJobs}
-              renderRow={renderRow}
-              emptyMessage="No jobs found matching your criteria."
-              pagination={{
-                currentPage,
-                totalPages,
-                onPageChange: setCurrentPage
-              }}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {currentJobs.map(job => (
+              <JobCard 
+                key={job.id} 
+                job={job}
+                isAdmin={true}
+                onSelect={(job) => handleShowDetails(job)}
+                onApprove={(job) => updateJobStatus(job.id, 'ACTIVE')}
+                onReject={(job) => updateJobStatus(job.id, 'REJECTED')}
+              />
+            ))}
           </div>
         )}
       </div>
-
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Job Details"
-        size="lg"
-        footer={
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Close</Button>
-            {selectedJob?.status === 'PENDING' && (
-              <>
-                <Button 
-                  variant="outline" 
-                  className="text-red-600 border-red-200 hover:bg-red-50"
-                  onClick={() => updateJobStatus(selectedJob.id, 'REJECTED')}
-                >
-                  Reject
-                </Button>
-                <Button 
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => updateJobStatus(selectedJob.id, 'ACTIVE')}
-                >
-                  Approve
-                </Button>
-              </>
-            )}
-          </div>
-        }
-      >
-        {selectedJob && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-start border-b border-gray-100 pb-4">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">{selectedJob.title}</h2>
-                <p className="text-gray-600 font-medium mt-1">{selectedJob.company} • {selectedJob.location}</p>
-              </div>
-              <Badge variant={selectedJob.status}>{selectedJob.status}</Badge>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="block text-sm text-gray-500 mb-1 font-medium">Type</span>
-                <span className="font-bold text-gray-900">{selectedJob.type}</span>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="block text-sm text-gray-500 mb-1 font-medium">Level</span>
-                <span className="font-bold text-gray-900">{selectedJob.level}</span>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="block text-sm text-gray-500 mb-1 font-medium">Salary</span>
-                <span className="font-bold text-gray-900">{selectedJob.salary || 'Not specified'}</span>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="block text-sm text-gray-500 mb-1 font-medium">Posted</span>
-                <span className="font-bold text-gray-900">{new Date(selectedJob.createdAt).toLocaleDateString()}</span>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2 border-b border-gray-100 pb-2">Description</h3>
-                <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-xl border border-gray-100">{selectedJob.description}</p>
-              </div>
-              
-              {selectedJob.details && (
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 border-b border-gray-100 pb-2">Requirements & Details</h3>
-                  <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-xl border border-gray-100">{selectedJob.details}</p>
-                </div>
-              )}
-              
-              {selectedJob.tags && selectedJob.tags.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 border-b border-gray-100 pb-2">Tags</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedJob.tags.map(tag => (
-                      <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium border border-gray-200">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-6 mb-8 gap-2">
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentPage(i + 1)}
+              className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
+                currentPage === i + 1 
+                  ? 'bg-primary text-white' 
+                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+        </div>
+      )}
     </DashboardLayout>
   );
 }

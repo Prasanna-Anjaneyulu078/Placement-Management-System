@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Search, MapPin, Briefcase, Award, X, CheckCircle, Calendar, ChevronRight, XCircle } from 'lucide-react';
-import { PageHeader, Modal, Button, LoadingSpinner } from '../../components/common';
+import { PageHeader, Modal, Button, LoadingSpinner, JobCard } from '../../components/common';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../utils/axiosConfig';
 import './StudentJobs.css';
@@ -15,13 +16,9 @@ export default function StudentJobs() {
   const [profile, setProfile] = useState(null);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   
-  const [selectedJob, setSelectedJob] = useState(null); // Full job details modal
   const [confirmingJob, setConfirmingJob] = useState(null); // Confirmation modal
-  
-  // To store full job details when clicking on an applied/closed job which only returns a DTO
-  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchData();
@@ -53,12 +50,7 @@ export default function StudentJobs() {
   };
 
   const getFilteredJobs = (jobsList) => {
-    if (!searchTerm) return jobsList;
-    return jobsList.filter(job => {
-      const title = (job.title || job.jobTitle || '').toLowerCase();
-      const comp = (job.company || '').toLowerCase();
-      return title.includes(searchTerm.toLowerCase()) || comp.includes(searchTerm.toLowerCase());
-    });
+    return jobsList; // Filter removed per request
   };
 
   const checkEligibility = (job) => {
@@ -98,12 +90,8 @@ export default function StudentJobs() {
     }
   };
 
-  const openJobDetails = async (job) => {
-    // If it's from Applied Jobs DTO, we might not have all details, but we can display what we have or fetch full.
-    // For this redesign, the applied job DTO only has basic info.
-    // Let's see if we can just use the provided info, or ideally we'd have a full job fetch.
-    // For now, we will display what we have.
-    setSelectedJob(job);
+  const openJobDetails = (job) => {
+    navigate(`/student/jobs/${job.id}`);
   };
 
   const getStatusClass = (status) => {
@@ -127,40 +115,22 @@ export default function StudentJobs() {
         <div className="job-tabs">
           <button 
             className={`job-tab-btn ${activeTab === 'open' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('open'); setSearchTerm(''); }}
+            onClick={() => setActiveTab('open')}
           >
             Open Jobs
           </button>
           <button 
             className={`job-tab-btn ${activeTab === 'applied' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('applied'); setSearchTerm(''); }}
+            onClick={() => setActiveTab('applied')}
           >
             Applied Jobs
           </button>
           <button 
             className={`job-tab-btn ${activeTab === 'closed' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('closed'); setSearchTerm(''); }}
+            onClick={() => setActiveTab('closed')}
           >
             Closed Jobs
           </button>
-        </div>
-
-        <div className="search-section">
-          <div className="search-box">
-            <Search className="search-icon" size={20} />
-            <input 
-              type="text" 
-              placeholder="Search by job title or company..." 
-              className="main-search-input"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button className="clear-input-btn" onClick={() => setSearchTerm('')}>
-                <X size={16} />
-              </button>
-            )}
-          </div>
         </div>
 
         {isLoading ? (
@@ -180,45 +150,17 @@ export default function StudentJobs() {
                     <p>No jobs available currently.</p>
                   </div>
                 ) : (
-                  <div className="jobs-grid">
-                    {getFilteredJobs(openJobs).map(job => {
-                      const eligibility = checkEligibility(job);
-                      return (
-                        <div key={job.id} className="portal-job-card">
-                          <div className="job-card-header">
-                            <div>
-                              <h3 className="job-title">{job.title}</h3>
-                              <p className="job-company">{job.company}</p>
-                            </div>
-                            <div className="job-type-badge">{job.jobType || 'Full-time'}</div>
-                          </div>
-                          
-                          <div className="job-card-body">
-                            <div className="info-row"><MapPin size={16}/> {job.location || 'Remote'}</div>
-                            <div className="info-row"><Award size={16}/> Min CGPA: {job.minCgpa || 'N/A'}</div>
-                            <div className="info-row"><Calendar size={16}/> Exp: {job.expiryDate || 'N/A'}</div>
-                          </div>
-
-                          <div className="job-card-footer">
-                            {eligibility.eligible ? (
-                              <div className="eligibility-status success">
-                                <CheckCircle size={16} /> Eligible
-                              </div>
-                            ) : (
-                              <div className="eligibility-status error" title={eligibility.message}>
-                                <XCircle size={16} /> Not Eligible
-                              </div>
-                            )}
-                            <div className="action-buttons">
-                              <button className="btn-secondary" onClick={() => openJobDetails(job)}>Details</button>
-                              {eligibility.eligible && (
-                                <button className="btn-primary" onClick={() => handleApply(job)}>Apply</button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {getFilteredJobs(openJobs).map(job => (
+                      <JobCard 
+                        key={job.id}
+                        job={job}
+                        onSelect={openJobDetails}
+                        onApply={handleApply}
+                        eligibility={checkEligibility(job)}
+                        role="student"
+                      />
+                    ))}
                   </div>
                 )}
               </>
@@ -233,20 +175,21 @@ export default function StudentJobs() {
                     <p>You have not applied for any jobs yet.</p>
                   </div>
                 ) : (
-                  <div className="applied-jobs-list">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {getFilteredJobs(appliedJobs).map(app => (
-                      <div key={app.id} className="applied-job-item">
-                        <div className="applied-info">
-                          <h3 className="job-title">{app.jobTitle}</h3>
-                          <p className="job-company">{app.company}</p>
-                          <span className="applied-date">Applied on: {new Date(app.appliedAt).toLocaleDateString()}</span>
-                        </div>
-                        <div className="applied-actions">
-                          <span className={`status-badge ${getStatusClass(app.status)}`}>
-                            {app.status}
-                          </span>
-                        </div>
-                      </div>
+                      <JobCard 
+                        key={app.id}
+                        job={{
+                          id: app.jobId || app.id,
+                          title: app.jobTitle,
+                          company: app.company,
+                          status: app.status
+                        }}
+                        onSelect={() => openJobDetails({ id: app.jobId || app.id })}
+                        hasApplied={true}
+                        statusOverride={app.status}
+                        role="student"
+                      />
                     ))}
                   </div>
                 )}
@@ -262,26 +205,15 @@ export default function StudentJobs() {
                     <p>No closed jobs available.</p>
                   </div>
                 ) : (
-                  <div className="jobs-grid">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {getFilteredJobs(closedJobs).map(job => (
-                      <div key={job.id} className="portal-job-card closed-card">
-                        <div className="job-card-header">
-                          <div>
-                            <h3 className="job-title">{job.title}</h3>
-                            <p className="job-company">{job.company}</p>
-                          </div>
-                          <span className="status-badge status-closed">CLOSED</span>
-                        </div>
-                        
-                        <div className="job-card-body">
-                          <div className="info-row"><MapPin size={16}/> {job.location || 'N/A'}</div>
-                          <div className="info-row"><Calendar size={16}/> Closed on: {job.expiryDate || 'N/A'}</div>
-                        </div>
-
-                        <div className="job-card-footer justify-end">
-                          <button className="btn-secondary w-full" onClick={() => openJobDetails(job)}>View Details</button>
-                        </div>
-                      </div>
+                      <JobCard 
+                        key={job.id}
+                        job={job}
+                        onSelect={openJobDetails}
+                        role="student"
+                        customStatusBadge={<span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200">CLOSED</span>}
+                      />
                     ))}
                   </div>
                 )}
@@ -291,78 +223,7 @@ export default function StudentJobs() {
         )}
       </div>
 
-      {/* JOB DETAILS MODAL */}
-      <Modal
-        isOpen={!!selectedJob}
-        onClose={() => setSelectedJob(null)}
-        title={activeTab === 'applied' ? "Application Details" : "Job Details"}
-        footer={
-          <div className="flex gap-3 justify-end w-full">
-            <Button variant="outline" onClick={() => setSelectedJob(null)}>Close</Button>
-            {activeTab === 'open' && checkEligibility(selectedJob).eligible && (
-              <Button onClick={() => { handleApply(selectedJob); setSelectedJob(null); }}>
-                Apply Now
-              </Button>
-            )}
-          </div>
-        }
-      >
-        {selectedJob && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
-              <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-                {(selectedJob.company || selectedJob.jobTitle || 'J').charAt(0)}
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{selectedJob.title || selectedJob.jobTitle}</h2>
-                <p className="text-gray-500">{selectedJob.company}</p>
-              </div>
-            </div>
 
-            {/* Display full details if available (Open/Closed jobs) */}
-            {selectedJob.description !== undefined && (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Type</p>
-                    <p className="font-bold text-gray-900">{selectedJob.jobType || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Location</p>
-                    <p className="font-bold text-gray-900">{selectedJob.location || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Min CGPA</p>
-                    <p className="font-bold text-gray-900">{selectedJob.minCgpa || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Expiry</p>
-                    <p className="font-bold text-gray-900">{selectedJob.expiryDate || 'N/A'}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2">Description</h4>
-                  <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedJob.description || 'No description available.'}</p>
-                </div>
-              </>
-            )}
-
-            {/* Display applied specific details */}
-            {activeTab === 'applied' && (
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider mb-2">Application Status</h4>
-                <div className="flex justify-between items-center">
-                  <span className={`status-badge ${getStatusClass(selectedJob.status)} text-sm px-4 py-2`}>
-                    {selectedJob.status}
-                  </span>
-                  <span className="text-blue-700 font-medium">Applied on {new Date(selectedJob.appliedAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
 
       {/* CONFIRMATION MODAL */}
       <Modal

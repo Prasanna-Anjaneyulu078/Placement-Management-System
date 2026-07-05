@@ -2,10 +2,16 @@ package com.college.placementportal.controller;
 
 import com.college.placementportal.entity.Job;
 import com.college.placementportal.service.JobService;
+import com.college.placementportal.service.JobImageService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/jobs")
@@ -13,6 +19,9 @@ public class JobController {
 
     @Autowired
     private JobService jobService;
+
+    @Autowired
+    private JobImageService jobImageService;
 
     @GetMapping("/approved")
     public ResponseEntity<?> getApprovedJobs() {
@@ -73,5 +82,59 @@ public class JobController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @PostMapping("/{id}/logo")
+    public ResponseEntity<?> uploadLogo(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        if (id == null) {
+            return ResponseEntity.badRequest().body("Job ID cannot be null");
+        }
+        try {
+            String fileUrl = jobImageService.storeLogo(file, id);
+            return ResponseEntity.ok().body("{\"url\":\"" + fileUrl + "\"}");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/banner")
+    public ResponseEntity<?> uploadBanner(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        if (id == null) {
+            return ResponseEntity.badRequest().body("Job ID cannot be null");
+        }
+        try {
+            String fileUrl = jobImageService.storeBanner(file, id);
+            return ResponseEntity.ok().body("{\"url\":\"" + fileUrl + "\"}");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/images/{type}/{fileName:.+}")
+    public ResponseEntity<Resource> downloadImage(@PathVariable String type, @PathVariable String fileName, HttpServletRequest request) {
+        Resource resource;
+        if ("logo".equals(type)) {
+            resource = jobImageService.loadLogoAsResource(fileName);
+        } else if ("banner".equals(type)) {
+            resource = jobImageService.loadBannerAsResource(fileName);
+        } else {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String contentType = null;
+        try {
+            contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
+        } catch (Exception ex) {
+            // Fallback
+        }
+
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
     }
 }

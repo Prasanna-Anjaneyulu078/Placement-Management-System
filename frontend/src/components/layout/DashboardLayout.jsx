@@ -42,6 +42,14 @@ export default function DashboardLayout({ children, role = 'student' }) {
           }
         })
         .catch(err => console.error(err));
+    } else if (role === 'alumni') {
+      api.get('/alumni/profile')
+        .then(res => {
+          if (res.data?.profileImageUrl) {
+            updateProfileImage(res.data.profileImageUrl);
+          }
+        })
+        .catch(err => console.error(err));
     }
     
     const handleProfileUpdate = (e) => {
@@ -99,7 +107,13 @@ export default function DashboardLayout({ children, role = 'student' }) {
     const roleLabel = role === 'student' ? 'Student Portal'
       : role === 'alumni' ? 'Alumni Portal'
       : (userDesignation || 'Administrator');
-    return { name: displayName, role: roleLabel, img: profileImage, designation: userDesignation };
+      
+    let formattedImg = profileImage;
+    if (formattedImg && !formattedImg.includes('http') && role === 'alumni') {
+      formattedImg = `http://localhost:8082/api/public/alumni/profile-image/${formattedImg}`;
+    }
+
+    return { name: displayName, role: roleLabel, img: formattedImg, designation: userDesignation };
   };
 
   return (

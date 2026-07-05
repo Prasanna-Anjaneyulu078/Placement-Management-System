@@ -22,6 +22,16 @@ public class Job {
     
     private String location;
     private String jobType;
+    private String packageDetails;
+    private String experienceRequired;
+    private String requiredSkills;
+    private String applicationLink;
+
+    private String companyLogoUrl;
+    private String jobBannerUrl;
+    private String industry;
+    private String companySize;
+    private Integer openings;
 
     // Eligibility Criteria
     private Double minCgpa;
@@ -47,13 +57,22 @@ public class Job {
     }
     public Job() {}
 
-    public Job(Long id, String title, String company, String description, String location, String jobType, Double minCgpa, Integer eligibleSemester, Integer maxBacklogs, LocalDate expiryDate, String rejectionReason, User postedBy, LocalDateTime createdAt) {
+    public Job(Long id, String title, String company, String description, String location, String jobType, String packageDetails, String experienceRequired, String requiredSkills, String applicationLink, String companyLogoUrl, String jobBannerUrl, String industry, String companySize, Integer openings, Double minCgpa, Integer eligibleSemester, Integer maxBacklogs, LocalDate expiryDate, String rejectionReason, User postedBy, LocalDateTime createdAt) {
         this.id = id;
         this.title = title;
         this.company = company;
         this.description = description;
         this.location = location;
         this.jobType = jobType;
+        this.packageDetails = packageDetails;
+        this.experienceRequired = experienceRequired;
+        this.requiredSkills = requiredSkills;
+        this.applicationLink = applicationLink;
+        this.companyLogoUrl = companyLogoUrl;
+        this.jobBannerUrl = jobBannerUrl;
+        this.industry = industry;
+        this.companySize = companySize;
+        this.openings = openings;
         this.minCgpa = minCgpa;
         this.eligibleSemester = eligibleSemester;
         this.maxBacklogs = maxBacklogs;
@@ -173,6 +192,78 @@ public class Job {
 
     public void setStatus(JobStatus status) {
         this.status = status;
+    }
+
+    public String getPackageDetails() {
+        return packageDetails;
+    }
+
+    public void setPackageDetails(String packageDetails) {
+        this.packageDetails = packageDetails;
+    }
+
+    public String getExperienceRequired() {
+        return experienceRequired;
+    }
+
+    public void setExperienceRequired(String experienceRequired) {
+        this.experienceRequired = experienceRequired;
+    }
+
+    public String getRequiredSkills() {
+        return requiredSkills;
+    }
+
+    public void setRequiredSkills(String requiredSkills) {
+        this.requiredSkills = requiredSkills;
+    }
+
+    public String getApplicationLink() {
+        return applicationLink;
+    }
+
+    public void setApplicationLink(String applicationLink) {
+        this.applicationLink = applicationLink;
+    }
+
+    public String getCompanyLogoUrl() {
+        return companyLogoUrl;
+    }
+
+    public void setCompanyLogoUrl(String companyLogoUrl) {
+        this.companyLogoUrl = companyLogoUrl;
+    }
+
+    public String getJobBannerUrl() {
+        return jobBannerUrl;
+    }
+
+    public void setJobBannerUrl(String jobBannerUrl) {
+        this.jobBannerUrl = jobBannerUrl;
+    }
+
+    public String getIndustry() {
+        return industry;
+    }
+
+    public void setIndustry(String industry) {
+        this.industry = industry;
+    }
+
+    public String getCompanySize() {
+        return companySize;
+    }
+
+    public void setCompanySize(String companySize) {
+        this.companySize = companySize;
+    }
+
+    public Integer getOpenings() {
+        return openings;
+    }
+
+    public void setOpenings(Integer openings) {
+        this.openings = openings;
     }
 
 }
